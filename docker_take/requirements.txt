@@ -1,0 +1,6 @@
+IPython
+matplotlib
+pandas
+scipy
+sklearn
+tensorflow_addons
