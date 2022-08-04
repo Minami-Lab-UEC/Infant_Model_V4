@@ -68,7 +68,7 @@ MODEL_LOAD = False
 
 # env = gym.make('CartPole-v0')
 # num_episodes = 20000  # 総試行回数(episode数)
-num_episodes = 1000 # 総試行回数(episode数)
+num_episodes = 10000 # 総試行回数(episode数)
 max_number_of_steps = 5  # 1試行のstep数
 goal_average_reward = 195  # この報酬を超えると学習終了
 num_consecutive_iterations = 10  # 学習完了評価の平均計算を行う試行回数

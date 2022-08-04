@@ -115,21 +115,21 @@ def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requ
         if objectIndex == predict_idx:
             reward = 1
         else:
-            # reward = -1
-            if guess == 1:
-                reward = -0.2
-            elif guess == 0:
-                reward = -1.2
+            reward = -1
+            # if guess == 1:
+            #     reward = -0.2
+            # elif guess == 0:
+            #     reward = -1.2
         terminal = 1
     elif objectIndex == predict_idx:
         reward = 1
         terminal = 1
     else:
-        # reward = -1
-        if guess == 1:
-            reward = -0.2
-        elif guess == 0:
-            reward = -1.2
+        reward = -1
+        # if guess == 1:
+        #     reward = -0.2
+        # elif guess == 0:
+        #     reward = -1.2
 
     return reward, terminal
 
