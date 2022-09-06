@@ -195,7 +195,7 @@ class Database():
             if get_number >= len(self.data):
                 return base
             objFeatures = self.data.loc[get_number]
-            print(self.data.loc[get_number]['name'])
+            # print(self.data.loc[get_number]['name'])
         else:
             name = self.name[object_number]
             bool_list = self.verb["name"] == name
