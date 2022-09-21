@@ -68,7 +68,7 @@ MODEL_LOAD = False
 
 # env = gym.make('CartPole-v0')
 # num_episodes = 20000  # 総試行回数(episode数)
-num_episodes = 10000 # 総試行回数(episode数)
+num_episodes = 6000 # 総試行回数(episode数)
 max_number_of_steps = 5  # 1試行のstep数
 goal_average_reward = 195  # この報酬を超えると学習終了
 num_consecutive_iterations = 10  # 学習完了評価の平均計算を行う試行回数
@@ -116,6 +116,7 @@ output_length = actions_length + objects_length
 
 # obj_val_idx_list = np.zeros((1, max_number_of_steps, actions_length)) # 特徴選択の推移を見るため、特徴選択を保存するリストを用意する, ダミーをまず入れる
 obj_val_idx_list = [[[]]] # 特徴選択の推移を見るため、特徴選択を保存するリストを用意する, ダミーをまず入れる
+obj_name_idx_list = [[[]]] # 名称選択の推移を見るため、名称選択を保存するリストを用意する, ダミーをまず入れる
 
 correct_count = [0] * (objects_length - 1) # 各ラベルの正答数
 count = [0] * (objects_length - 1) # 各ラベルの総数
@@ -145,6 +146,7 @@ actor = Actor(features_length=features_length, objects_length=objects_length, ac
 
 
 for episode in range(num_episodes):
+    print('episode : ', episode)
     #Data.clear()
     np.random.seed(episode)
     rand = np.random.randint(0, 65535)
@@ -157,7 +159,8 @@ for episode in range(num_episodes):
     obj = [0] * objects_length
     fea_vec = [0] * actions_length # 特徴の種類
     fea_val = [0] * features_length # 特徴量の値
-    requests = []
+    requests = [] # 特徴選択の推移
+    name_requests = [] # 名称選択の推移
     mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
     #mask1 = [1] * actions_length + [-float('inf')] * objects_length
     mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
@@ -175,6 +178,7 @@ for episode in range(num_episodes):
     
     # obj_val_idx_l = np.array([0] * actions_length) # エピソード内のステップごとに選択した特徴選択を保存する
     obj_val_idx_l = [[]] # エピソード内のステップごとに選択した特徴を保存する
+    obj_name_idx_l = [[symbols[objectIndex]]] # エピソード内のステップごとに選択した名称を保存する
     for step in range(max_number_of_steps):
         pre_fea_vec = copy.deepcopy(fea_vec)
         pre_obj_vec = copy.deepcopy(obj)
@@ -186,7 +190,7 @@ for episode in range(num_episodes):
         out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
         out[0][step] = np.reshape(out_1, [1, output_length])
         obj_val_idx, retTargetQs = actor.get_value(action_step_state, out, mask1, episode, mainQN) # 時刻tで取得する特徴量を決定
-        print("{}:{} retTargetQs : {}".format(episode, step, retTargetQs))
+        # print("{}:{} retTargetQs : {}".format(episode, step, retTargetQs))
         retTargetQs = retTargetQs[retTargetQs != 0] # 確率が0のものがたまに含まれるので削除
         # obj_val_idx_l = np.vstack([obj_val_idx_l, retTargetQs])
         
@@ -194,7 +198,7 @@ for episode in range(num_episodes):
         request = actions[obj_val_idx]
         # print("request : ", request)
         requests.append(request)
-        print("requests : ", requests)
+        # print("requests : ", requests)
         fea_val = Data.Overfetch_V2(objectIndex, list(set(requests)), rand)       
         state2 = np.concatenate([fea_vec, fea_val, obj, guess])
         state2 = np.reshape(state2, [1,state_length])
@@ -209,8 +213,9 @@ for episode in range(num_episodes):
         name = symbols[obj_name_idx - actions_length]
         obj[obj_name_idx - actions_length] = 1
         if name == 'not_sure':
-            guess[0] += 1
+            # guess[0] += 1
             not_sure_count = 1
+        name_requests.append(name) # 選択した名称をリストで保存
         
         # 報酬を設定し、与える
         # reward, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), guess[0], step, max_number_of_steps, False, requests, request)
@@ -233,6 +238,8 @@ for episode in range(num_episodes):
         memory_step.add(memory_in)
         
         #memory.add((state2, state1, mask2, mask1, obj_name_idx, reward, terminal)) # メモリの更新(物体の名称)
+
+        print('memory_episode.len() : ', memory_episode.len())
         
         if (memory_episode.len() > batch_size) and terminal == 1:
             if PER_MODE == True:
@@ -244,7 +251,7 @@ for episode in range(num_episodes):
             else:
                 history = mainQN.replay(memory_episode, batch_size, gamma, targetQN)
         else:
-            print('replay progress : ')
+            # print('replay progress : ')
             history = mainQN.replay(memory_step, 1, gamma, targetQN)
             
         # test 20220413
@@ -255,12 +262,15 @@ for episode in range(num_episodes):
             # for _ in range(max_number_of_steps - step - 1):
             #     obj_val_idx_l = np.vstack([obj_val_idx_l, obj_val_idx_l[-1]]) # 途中でエピソードが打ち切られる場合には、最後のステップの結果をコピーする
             obj_val_idx_l.append(requests)
+            obj_name_idx_l.append(name_requests)
+            
 
-            """
+            # """ # ERを使うためにmemory_episodeにメモリを貯めていくことにする 20220909
+            # なぜこの3行がまとめてコメントアウトされていたか分からない
             memory_episode.add(memory_in)
             TDerror = memory_TDerror.get_TDerror(memory_episode, gamma, mainQN, targetQN)
             memory_TDerror.add(TDerror)
-            """
+            # """
             
             if episode % set_targetQN_interval == 0:
                 targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
@@ -270,8 +280,10 @@ for episode in range(num_episodes):
             break
     # obj_val_idx_l = np.delete(obj_val_idx_l, 0, 0) # ダミーで入れた最初の行を削除する
     obj_val_idx_l.pop(0) # ダミーデータの削除
+    # obj_name_idx_l.pop(0) # ダミーデータの削除
     # obj_val_idx_list = np.vstack([obj_val_idx_list, [obj_val_idx_l]]) # 毎エピソードで選択した特徴選択を保存する
     obj_val_idx_list.append(obj_val_idx_l) # 毎エピソードで選択した特徴を保存する
+    obj_name_idx_list.append(obj_name_idx_l) # 毎エピソードで選択した名称を保存する
             
     
     if episode % test_epochs_interval == 0:
@@ -301,8 +313,10 @@ for episode in range(num_episodes):
     
 # obj_val_idx_list = np.delete(obj_val_idx_list, 0, 0) # ダミーで入れた最初の行を削除する
 obj_val_idx_list.pop(0) # ダミーで入れた最初の行を削除する
+obj_name_idx_list.pop(0) # ダミーで入れた最初の行を削除する
 
 np.save(dir_path + "obj_val_idx_list", obj_val_idx_list) # 特徴選択の推移を後で計算するため特徴選択のリストを保存する
+np.save(dir_path + "obj_name_idx_list", obj_name_idx_list) # 名称選択の推移を後で計算するため名称選択のリストを保存する
 with open(dir_path+'+LSTM_acc.pickle', mode='wb') as f:
     pickle.dump(acc, f)
     

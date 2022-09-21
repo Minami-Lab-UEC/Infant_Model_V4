@@ -317,7 +317,7 @@ class QNetwork:
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                targets_restore[i][j] = self.model.predict([state_t, out_t, mask_b], verbose=0)
+                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b], verbose=0)
                 targets_restore[i][j][action_b] = target
                 
             targets[i] = np.mean(targets_restore[i], axis=0)
@@ -451,7 +451,8 @@ class Memory_TDerror(Memory):
         
         for j, (state, next_state, out, next_out, mask, next_mask, action, reward, terminal) in enumerate(memory.buffer[memory.len() - 1]):
             next_state_t[j:j+1] = np.reshape(state, [1, self.state_size])
-            next_out_vec_t[j:j+1] = np.reshape(state, [1, self.output_size])
+            # next_out_vec_t[j:j+1] = np.reshape(state, [1, self.output_size])
+            next_out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size]) # self.output_sizeのデフォルトが10, outと一致するので, stateではなくoutでは？20220910
             
             next_state = np.reshape(next_state, [1, self.state_size])
             next_mask = np.reshape(next_mask, [1, self.output_size])
@@ -465,9 +466,11 @@ class Memory_TDerror(Memory):
             state = np.reshape(state, [1, self.state_size])
             mask = np.reshape(mask, [1, self.output_size])
             state_t[j:j+1] = state
-            out_t[j:j+1] = np.reshape(out, [1, self.output_size])
+            # out_t[j:j+1] = np.reshape(out, [1, self.output_size])
+            out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size]) # out_tがないといわれる. out_vec_tではないか？20220910
             
-            TDerror.append(target - targetQN.model.predict([state_t, out_t, mask], verbose=0)[0][action])
+            # TDerror.append(target - targetQN.model.predict([state_t, out_t, mask], verbose=0)[0][action])
+            TDerror.append(target - targetQN.model.predict([state_t, out_vec_t, mask], verbose=0)[0][action]) # out_tがないといわれる. out_vec_tではないか？20220910
         
         return sum(TDerror) / len(TDerror)
         
@@ -481,7 +484,8 @@ class Memory_TDerror(Memory):
             
             for j, (state, next_state, out, next_out, mask, next_mask, action, reward, terminal) in enumerate(memory.buffer[i]):
                 next_state_t[j:j+1] = np.reshape(state, [1, self.state_size])
-                next_out_vec_t[j:j+1] = np.reshape(state, [1, self.output_size])
+                # next_out_vec_t[j:j+1] = np.reshape(state, [1, self.output_size])
+                next_out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size]) # self.output_sizeのデフォルトが10, outと一致するので, stateではなくoutでは？20220910
                 
                 next_state = np.reshape(next_state, [1, self.state_size])
                 next_mask = np.reshape(next_mask, [1, self.output_size])
@@ -495,8 +499,10 @@ class Memory_TDerror(Memory):
                 state = np.reshape(state, [1, self.state_size])
                 mask = np.reshape(mask, [1, self.output_size])
                 state_t[j:j+1] = state
-                out_t[j:j+1] = np.reshape(out, [1, self.output_size])
-                TDerror.append(target - targetQN.model.predict([state_t, out_t, mask], verbose=0)[0][action])
+                # out_t[j:j+1] = np.reshape(out, [1, self.output_size])
+                # TDerror.append(target - targetQN.model.predict([state_t, out_t, mask], verbose=0)[0][action])
+                out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size]) # out_tがないといわれる. out_vec_tではないか？20220910
+                TDerror.append(target - targetQN.model.predict([state_t, out_vec_t, mask], verbose=0)[0][action]) # out_tがないといわれる. out_vec_tではないか？20220910
                 
             self.buffer[i] = sum(TDerror) / len(TDerror)
             
