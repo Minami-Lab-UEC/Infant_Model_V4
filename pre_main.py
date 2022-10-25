@@ -3,6 +3,7 @@
 
 # In[1]:
 
+print('test')
 
 # coding:utf-8
 # [0]必要なライブラリのインポート
