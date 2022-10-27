@@ -6,7 +6,7 @@
 
 # coding:utf-8
 # [0]必要なライブラリのインポート
-import gym  # 倒立振子(cartpole)の実行環境
+# import gym  # 倒立振子(cartpole)の実行環境
 import numpy as np
 import time
 import pandas as pd
@@ -33,7 +33,7 @@ from tensorflow_addons.optimizers import RectifiedAdam
 # In[2]:
 
 
-def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request, predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+def reward_func(objectIndex,_idx, guess, step, max_step, test_mode, requests, request,_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
     terminal = 0 # 終了しているか否か
     reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
@@ -41,18 +41,18 @@ def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requ
     
     if step+1 == max_step:
         if test_mode == True:
-            if objectIndex == predict_idx:
+            if objectIndex ==_idx:
                 reward = 1
             else:
                 reward = -1
         else:
             #reward = -5
-            if objectIndex == predict_idx:
+            if objectIndex ==_idx:
                 reward = 5
             else:
                 reward = -3
         terminal = 1
-    elif objectIndex == predict_idx:
+    elif objectIndex ==_idx:
         if test_mode == True:
             reward = 1
         else:
@@ -60,19 +60,19 @@ def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requ
         terminal = 1
         """
         if parent_select == 0:
-            if predict_val_idx == verb_idx:
+            if_val_idx == verb_idx:
                 reward_feature += -0.5
             
-            if predict_val_idx != verb_idx:
+            if_val_idx != verb_idx:
                 reward_feature = 0.25
             else:
                 reward_feature = -0.25
             
         else:
-            if predict_val_idx != verb_idx:
+            if_val_idx != verb_idx:
                 reward_feature += -0.5
             
-            if predict_val_idx == verb_idx:
+            if_val_idx == verb_idx:
                 reward_feature = 0.25
             else:
                 reward_feature = -0.25
@@ -92,31 +92,31 @@ def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requ
                 reward = -5
               
             if parent_select == 0:
-                if symbols[predict_idx] in symbols_verb:
+                if symbols_idx in symbols_verb:
                     reward_name = -1
-                if predict_val_idx == verb_idx:
+                if_val_idx == verb_idx:
                     reward_feature = -1
                 """
-                if symbols[predict_idx] not in symbols_verb:
+                if symbols_idx] not in symbols_verb:
                     reward_name = 0.25
                 else:
                     reward_name = -0.25
-                if predict_val_idx != verb_idx:
+                if_val_idx != verb_idx:
                     reward_feature = 0.25
                 else:
                     reward_feature = -0.25
                 """
             else:
-                if symbols[predict_idx] not in symbols_verb:
+                if symbols_idx not in symbols_verb:
                     reward_name = -1
-                if predict_val_idx != verb_idx:
+                if_val_idx != verb_idx:
                     reward_feature = -1
                 """
-                if symbols[predict_idx] in symbols_verb:
+                if symbols_idx] in symbols_verb:
                     reward_name = 0.25
                 else:
                     reward_name = -0.25
-                if predict_val_idx == verb_idx:
+                if_val_idx == verb_idx:
                     reward_feature = 0.25
                 else:
                     reward_feature = -0.25
@@ -185,12 +185,12 @@ class QNetwork:
         Q_N = softmax(Q_N)
         
         #Q_all = Concatenate()([Q_F, Q_N])
-        predictions = Concatenate()([Q_F, Q_N])
+       ions = Concatenate()([Q_F, Q_N])
         
-        #predictions = Dense(output_size, activation='softmax')(Q_all)
+        ions = Dense(output_size, activation='softmax')(Q_all)
         mask = Input(shape=(output_size,))
-        predictions = Multiply()([predictions, mask])
-        self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=predictions)
+       ions = Multiply()(ions, mask])
+        self.model = Model(inputs=[inputs, out, mask, parent_order], outputsions)
         opt = Adam(lr=learning_rate)
         #self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
         self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
@@ -198,11 +198,11 @@ class QNetwork:
         self.model.summary()
         
     def check_bias(self, data):
-        #names = [l.name for l in self.model.layers]
-        #print(names)
+        names = [l.name for l in self.model.layers]
+        print(names)
         layer_name = 'tf_op_layer_Softmax'
         intermediate_layer_model = Model(inputs=self.model.input, outputs=self.model.get_layer(layer_name).output)
-        return intermediate_layer_model.predict(data)
+        return intermediate_layer_model(data)
 
     # 重みの学習
     def replay(self, memory, batch_size, gamma, targetQN):
@@ -244,18 +244,18 @@ class QNetwork:
                     
                     next_state_t[j+1:j+2] = next_state_b
                     next_out_vec_t[j+1:j+2] = np.reshape(next_out_b, [1, self.output_size]) 
-                    retmainQs = self.model.predict([next_state_t, next_out_vec_t, next_mask_b,  parent_order_b])
+                    retmainQs = self.model([next_state_t, next_out_vec_t, next_mask_b,  parent_order_b])
                     next_action = np.argmax(retmainQs)  # 最大の報酬を返す行動を選択する
-                    target = reward_b + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][next_action]
+                    target = reward_b + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][next_action]
 
                 state_b = np.reshape(state_b, [1, self.state_size])
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                #targets[i][j] = self.model.predict([state, mask_b])    # Qネットワークの出力(Q値)
+                #targets[i][j] = self.model([state, mask_b])    # Qネットワークの出力(Q値)
                 #targets[i][j][action_b] = target               # 教師信号
-                #targets[i] = self.model.predict([state, mask_b])    # 怪しい
-                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b, parent_order_b])
+                #targets[i] = self.model([state, mask_b])    # 怪しい
+                targets_restore[i][j] = self.model([state_t, out_vec_t, mask_b, parent_order_b])
                 #targets[i][action_b] = target               # 怪しい
                 targets_restore[i][j][action_b] = target
                 
@@ -316,15 +316,15 @@ class QNetwork:
                     next_mask_b = np.reshape(next_mask_b, [1, self.output_size])
                     next_state_t[j+1:j+2] = next_state_b
                     next_out_vec_t[j+1:j+2] = np.reshape(next_out_b, [1, self.output_size]) 
-                    retmainQs = self.model.predict([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])
+                    retmainQs = self.model([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])
                     next_action = np.argmax(retmainQs)  # 最大の報酬を返す行動を選択する
-                    target = reward_b + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][next_action]
+                    target = reward_b + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][next_action]
 
                 state_b = np.reshape(state_b, [1, self.state_size])
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b, parent_order_b])
+                targets_restore[i][j] = self.model([state_t, out_vec_t, mask_b, parent_order_b])
                 targets_restore[i][j][action_b] = target
                 
             targets[i] = np.mean(targets_restore[i], axis=0)
@@ -409,7 +409,7 @@ class QNetwork:
                 out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
                 out[0][step] = np.reshape(out_1, [1, self.output_size])
                 
-                obj_val_idx = np.argmax(self.model.predict([action_step_state, out, mask1, parent_order]))# 時刻tで取得する特徴量を決定
+                obj_val_idx = np.argmax(self.model([action_step_state, out, mask1, parent_order]))# 時刻tで取得する特徴量を決定
                 """
                 if step != 4:
                     obj_val_idx = step
@@ -428,7 +428,7 @@ class QNetwork:
                 action_step_state[0][step+1] = state2
                 out_2 = np.concatenate([fea_vec, pre_obj_vec])
                 out[0][step+1] = np.reshape(out_2, [1, self.output_size])
-                obj_name_idx = np.argmax(self.model.predict([action_step_state, out, mask2, parent_order])) # 時刻tで取得する物体の名称を決定
+                obj_name_idx = np.argmax(self.model([action_step_state, out, mask2, parent_order])) # 時刻tで取得する物体の名称を決定
 
                 name = symbols[obj_name_idx - self.action_size]
                 obj[obj_name_idx - self.action_size] = 0
@@ -522,16 +522,16 @@ class Memory_TDerror(Memory):
             parent_order = np.reshape(parent_order, [1, self.parent_size])
             next_state_t[j+1:j+2] = next_state
             next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
-            retmainQs = mainQN.model.predict([next_state_t,  next_out_vec_t, next_mask, parent_order])
+            retmainQs = mainQN.model([next_state_t,  next_out_vec_t, next_mask, parent_order])
             next_action = np.argmax(retmainQs)
-            target = reward + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask, parent_order])[0][next_action]
+            target = reward + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])[0][next_action]
 
             state = np.reshape(state, [1, self.state_size])
             mask = np.reshape(mask, [1, self.output_size])
             state_t[j:j+1] = state
             out_t[j:j+1] = np.reshape(out, [1, self.output_size])
             
-            TDerror.append(target - targetQN.model.predict([state_t, out_t, mask, parent_order])[0][action])
+            TDerror.append(target - targetQN.model([state_t, out_t, mask, parent_order])[0][action])
         
         return sum(TDerror) / len(TDerror)
         
@@ -550,15 +550,15 @@ class Memory_TDerror(Memory):
                 parent_order = np.reshape(parent_order, [1, self.parent_size])
                 next_state_t[j+1:j+2] = next_state
                 next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
-                retmainQs = mainQN.model.predict([next_state_t, next_out_vec_t, next_mask, parent_order])
+                retmainQs = mainQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])
                 next_action = np.argmax(retmainQs)
-                target = reward + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask, parent_order])[0][next_action]
+                target = reward + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])[0][next_action]
 
                 state = np.reshape(state, [1, self.state_size])
                 mask = np.reshape(mask, [1, self.output_size])
                 state_t[j:j+1] = state
                 out_t[j:j+1] = np.reshape(out, [1, self.output_size])
-                TDerror.append(target - targetQN.model.predict([state_t, out_t, mask, parent_order])[0][action])
+                TDerror.append(target - targetQN.model([state_t, out_t, mask, parent_order])[0][action])
                 
             self.buffer[i] = sum(TDerror) / len(TDerror)
             
@@ -587,7 +587,7 @@ class Actor:
         epsilon = 0.1 + 0.9 / (1.0+(episode/500))
         
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
-            retTargetQs = mainQN.model.predict([state, out, mask, parent_order])
+            retTargetQs = mainQN.model([state, out, mask, parent_order])
             action = np.argmax(retTargetQs)  # 最大の報酬を返す行動を選択する
 
         else:
@@ -603,7 +603,7 @@ class Actor:
         epsilon = 0.01 + 0.99 / (1.0+episode)
         
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
-            retTargetQs = mainQN.model.predict([state, out, mask, parent_order])
+            retTargetQs = mainQN.model([state, out, mask, parent_order])
             action = np.argmax(retTargetQs)  # 最大の報酬を返す行動を選択する
 
         else:
