@@ -33,11 +33,13 @@ from tensorflow_addons.optimizers import RectifiedAdam
 # In[2]:
 
 
-def reward_func(objectIndex,_idx, guess, step, max_step, test_mode, requests, request,_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+def reward_func(objectIndex, _idx, guess, step, max_step, test_mode, requests, request,_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
     terminal = 0 # 終了しているか否か
     reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
     reward_name = 0 # 名称選択時にきちんと親が指定した名詞or動詞に注目しているか
+
+    # test_modeはpre_main.pyでFalseにされている
     
     if step+1 == max_step:
         if test_mode == True:
@@ -46,81 +48,42 @@ def reward_func(objectIndex,_idx, guess, step, max_step, test_mode, requests, re
             else:
                 reward = -1
         else:
-            #reward = -5
             if objectIndex ==_idx:
-                reward = 5
+                reward = 1
             else:
-                reward = -3
+                reward = -1
+                if guess == 1:
+                    reward = -0.2
         terminal = 1
     elif objectIndex ==_idx:
         if test_mode == True:
             reward = 1
         else:
-            reward = 10
+            reward = 1
         terminal = 1
-        """
-        if parent_select == 0:
-            if_val_idx == verb_idx:
-                reward_feature += -0.5
-            
-            if_val_idx != verb_idx:
-                reward_feature = 0.25
-            else:
-                reward_feature = -0.25
-            
-        else:
-            if_val_idx != verb_idx:
-                reward_feature += -0.5
-            
-            if_val_idx == verb_idx:
-                reward_feature = 0.25
-            else:
-                reward_feature = -0.25
-            """
+
     else:
-        if test_mode == False:
-            """
-            if request in requests:
-                reward= -1
-            else:
-                reward = 3
-            """
-            
-            if name == "not_sure":
-                reward = -0.5
-            else:
-                reward = -5
-              
+        if test_mode == False:           
+            # if name == "not_sure":
+            #     reward = -0.5
+            # else:
+            #     reward = -5
+            reward = -1
+            if guess == 1:
+                reward = -0.2
+
+            # 親の意図との関わりについて報酬設計している？               
             if parent_select == 0:
                 if symbols_idx in symbols_verb:
                     reward_name = -1
                 if_val_idx == verb_idx:
                     reward_feature = -1
-                """
-                if symbols_idx] not in symbols_verb:
-                    reward_name = 0.25
-                else:
-                    reward_name = -0.25
-                if_val_idx != verb_idx:
-                    reward_feature = 0.25
-                else:
-                    reward_feature = -0.25
-                """
+
             else:
                 if symbols_idx not in symbols_verb:
                     reward_name = -1
                 if_val_idx != verb_idx:
                     reward_feature = -1
-                """
-                if symbols_idx] in symbols_verb:
-                    reward_name = 0.25
-                else:
-                    reward_name = -0.25
-                if_val_idx == verb_idx:
-                    reward_feature = 0.25
-                else:
-                    reward_feature = -0.25
-                """
     
     return reward, reward_feature, reward_name, terminal
 
@@ -351,6 +314,8 @@ class QNetwork:
             fea_val = [0] * self.feature_length # 特徴量の値
             requests = []
             guess = [0] # not_sureを選んだ回数
+            not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
+
             tmp_info = np.array([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
                                  np.nan, np.nan, np.nan, np.nan, np.nan], dtype=object)
             
@@ -433,14 +398,16 @@ class QNetwork:
                 name = symbols[obj_name_idx - self.action_size]
                 obj[obj_name_idx - self.action_size] = 0
                 if name == 'not_sure':
-                    guess[0] += 1
+                    # guess[0] += 1 # pre_main.pyでもコメントアウトしたため、こちらもコメントアウトすべき？
+                    not_sure_count = 1
                     
                 tmp_info[2*step+2] = name
 
                 # 報酬を設定し、与える
-                reward, _, _, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), guess[0], step, max_number_of_steps,
+                reward, _, _, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
                                                                    True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
-                
+                not_sure_count = 0
+
                 tmp_info[step+1+10] = reward
                 
                 state1 = np.concatenate([fea_vec, fea_val, obj, guess])
@@ -454,7 +421,8 @@ class QNetwork:
                             bias_v = self.check_bias(data=[action_step_state, out, mask1, parent_order])
                     #print(self.check_bias(data=[action_step_state, out, mask1, parent_order]))
                     tmp_se = pd.Series(tmp_info, index=result_df.columns, name=episode+1)
-                    result_df = result_df.append(tmp_se, ignore_index=True)
+                    # result_df = result_df.append(tmp_se, ignore_index=True) # .appendが非推奨のため
+                    result_df = pd.concat([result_df, pd.DataFrame([tmp_se])], ignore_index=True)
                     if reward == 1:
                         reward_sum += 1
                         if episode < (test_epochs//2):

@@ -39,6 +39,8 @@ import pandas as pd
 
 # In[2]:
 
+# 時間計測スタート #
+starttime = time.time()
 
 dir_path = './result_9/'
 os.makedirs(dir_path, exist_ok=True)
@@ -61,7 +63,7 @@ def plot_history(epochs, acc):
     plt.ylabel('accuracy')
     plt.ylim([-0.02,1.02])
     # plt.savefig(dir_path + 'model_accuracy.png')
-    plt.savefig('figure_acc/figure_' + datetime.now().strftime('%Y%m%d') + '.png')
+    # plt.savefig('figure_acc/figure_' + datetime.now().strftime('%Y%m%d') + '.png')
     # plt.show()
 
 
@@ -186,6 +188,7 @@ for episode in range(num_episodes):
     correct = 0
 
     #Data.clear()
+    print('episode : ', episode)
     np.random.seed(episode)
     rand = np.random.randint(0, 65535)
     
@@ -245,6 +248,7 @@ for episode in range(num_episodes):
     mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
     mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
     guess = [0] # not_sureを選んだ回数
+    not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
     #parent_order = np.reshape(parent_order, [1, parent_length])
     parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
     
@@ -296,18 +300,19 @@ for episode in range(num_episodes):
         
         name = symbols[obj_name_idx - actions_length]
         obj[obj_name_idx - actions_length] = 1
-        """
         if name == 'not_sure':
-            guess[0] += 1
-        """
+            # guess[0] += 1
+            not_sure_count = 1
         
         # 報酬を設定し、与える
-        reward, reward_feature, reward_name, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), guess[0], step, max_number_of_steps,
+        reward, reward_feature, reward_name, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, max_number_of_steps,
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
         
         #act_val[obj_val_idx], act_name[obj_name_idx] = 1, 1
         
         reward = reward + reward_feature + reward_name
+
+        not_sure_count = 0 # 「分からない」フラグを元に戻す
         
         memory_in[step] = [state1.reshape(-1), state2.reshape(-1), out_1, out_2, mask1.reshape(-1), mask2.reshape(-1), obj_val_idx, reward, terminal, parent_order.reshape(-1)]
         #memory.add((state1, state2, mask1, mask2, obj_val_idx, reward, terminal)) # メモリの更新(特徴量)
@@ -345,7 +350,8 @@ for episode in range(num_episodes):
     obj_val_idx_list.append(obj_val_idx_l) # 毎エピソードで選択した特徴選択を保存する
 
     record = pd.Series([parent_select, correct], index=df.columns)
-    df = df.append(record, ignore_index=True)
+    # df = df.append(record, ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
     
     
     if episode % test_epochs_interval == 0:
@@ -391,12 +397,15 @@ with open(dir_path+'+LSTM_acc.pickle', mode='wb') as f:
 df.to_pickle(dir_path+'acc_transition.pkl')
 
     
-# plt.savefig(dir_path+'figure.png')
+plt.savefig(dir_path+'figure' + datetime.now().strftime('%Y%m%d' + '.png'))
 
 if MODEL_LOAD == False:
     os.makedirs(dir_path+'check_points/', exist_ok=True)
     mainQN.model.save_weights(dir_path+'check_points/my_checkpoint')
 
+# 時間計測の結果を出力
+print('----------------------------', file=codecs.open(dir_path+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
+print('time : ', time.time() - starttime, file=codecs.open(dir_path+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
 
 # In[ ]:
 
