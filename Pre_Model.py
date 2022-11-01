@@ -33,7 +33,7 @@ from tensorflow_addons.optimizers import RectifiedAdam
 # In[2]:
 
 
-def reward_func(objectIndex, _idx, guess, step, max_step, test_mode, requests, request,_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
     terminal = 0 # 終了しているか否か
     reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
@@ -43,19 +43,19 @@ def reward_func(objectIndex, _idx, guess, step, max_step, test_mode, requests, r
     
     if step+1 == max_step:
         if test_mode == True:
-            if objectIndex ==_idx:
+            if objectIndex == predict_idx:
                 reward = 1
             else:
                 reward = -1
         else:
-            if objectIndex ==_idx:
+            if objectIndex == predict_idx:
                 reward = 1
             else:
                 reward = -1
                 if guess == 1:
                     reward = -0.2
         terminal = 1
-    elif objectIndex ==_idx:
+    elif objectIndex == predict_idx:
         if test_mode == True:
             reward = 1
         else:
@@ -74,15 +74,15 @@ def reward_func(objectIndex, _idx, guess, step, max_step, test_mode, requests, r
 
             # 親の意図との関わりについて報酬設計している？               
             if parent_select == 0:
-                if symbols_idx in symbols_verb:
+                if symbols[predict_idx] in symbols_verb:
                     reward_name = -1
-                if_val_idx == verb_idx:
+                if predict_val_idx == verb_idx:
                     reward_feature = -1
 
             else:
-                if symbols_idx not in symbols_verb:
+                if symbols[predict_idx] not in symbols_verb:
                     reward_name = -1
-                if_val_idx != verb_idx:
+                if predict_val_idx != verb_idx:
                     reward_feature = -1
     
     return reward, reward_feature, reward_name, terminal
@@ -148,12 +148,12 @@ class QNetwork:
         Q_N = softmax(Q_N)
         
         #Q_all = Concatenate()([Q_F, Q_N])
-       ions = Concatenate()([Q_F, Q_N])
+        predictions = Concatenate()([Q_F, Q_N])
         
-        ions = Dense(output_size, activation='softmax')(Q_all)
+        # predictions = Dense(output_size, activation='softmax')(Q_all)
         mask = Input(shape=(output_size,))
-       ions = Multiply()(ions, mask])
-        self.model = Model(inputs=[inputs, out, mask, parent_order], outputsions)
+        predictions = Multiply()([predictions, mask])
+        self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=predictions)
         opt = Adam(lr=learning_rate)
         #self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
         self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
@@ -163,7 +163,7 @@ class QNetwork:
     def check_bias(self, data):
         names = [l.name for l in self.model.layers]
         print(names)
-        layer_name = 'tf_op_layer_Softmax'
+        layer_name = 'tf.nn.softmax'
         intermediate_layer_model = Model(inputs=self.model.input, outputs=self.model.get_layer(layer_name).output)
         return intermediate_layer_model(data)
 
@@ -414,11 +414,14 @@ class QNetwork:
                 
                 if terminal:
                     if episode < (test_epochs//2):
-                        if bias_n == []:
-                            bias_n = self.check_bias(data=[action_step_state, out, mask1, parent_order])
+                        pass # biasに関する動きが意味わからんのでパス
+                        # if bias_n == []:
+                        #     bias_n = self.check_bias(data=[action_step_state, out, mask1, parent_order])
                     else:
-                        if bias_v == []:
-                            bias_v = self.check_bias(data=[action_step_state, out, mask1, parent_order])
+                        pass # biasに関する動きが意味わからんのでパス
+                        # if bias_n == []:
+                        # if bias_v == []:
+                        #     bias_v = self.check_bias(data=[action_step_state, out, mask1, parent_order])
                     #print(self.check_bias(data=[action_step_state, out, mask1, parent_order]))
                     tmp_se = pd.Series(tmp_info, index=result_df.columns, name=episode+1)
                     # result_df = result_df.append(tmp_se, ignore_index=True) # .appendが非推奨のため
@@ -433,10 +436,10 @@ class QNetwork:
         
         result_df.to_csv(dir_path+str(num_episode+1)+'_result.csv')
         
-        with open(dir_path+str(num_episode+1)+'_result.csv', 'a') as f:
-            f.write('\n')
-            f.write('noun_bias_result: [' + str(bias_n[0][0]) + ',' + str(bias_n[0][1]) + ']' + '\n')
-            f.write('verb_bias_result: [' + str(bias_v[0][0]) + ',' + str(bias_v[0][1]) + ']' + '\n')
+        # with open(dir_path+str(num_episode+1)+'_result.csv', 'a') as f:
+        #     f.write('\n')
+        #     f.write('noun_bias_result: [' + str(bias_n[0][0]) + ',' + str(bias_n[0][1]) + ']' + '\n')
+        #     f.write('verb_bias_result: [' + str(bias_v[0][0]) + ',' + str(bias_v[0][1]) + ']' + '\n')
         
         return reward_sum, reward_sum_n, reward_sum_v
 

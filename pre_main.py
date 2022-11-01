@@ -3,7 +3,6 @@
 
 # In[1]:
 
-print('test')
 
 # coding:utf-8
 # [0]必要なライブラリのインポート
@@ -29,12 +28,13 @@ import os
 import pickle
 import copy
 import glob
-import datetime
+from datetime import datetime
 
 from Database_test import *
 from Pre_Model import *
 
 import pandas as pd
+import codecs
 
 
 # In[2]:
