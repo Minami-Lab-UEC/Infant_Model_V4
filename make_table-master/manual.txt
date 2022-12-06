@@ -1,0 +1,30 @@
+----- シェルスクリプト群のマニュアル -----
+・main_update.shは何かしらの表に特徴を加えた際に、mainの表にその項目を加える役割。
+・all_save.shはcsvファイルに表を書き出す役割。main_save.shはそれのmain版。
+・all_insert.shはデータを加えた際に、その加えたデータをmain以外の全ての表に加える役割。
+・all_change.shはデータを更新した際に、その更新をmain以外の全ての表でも行う役割。
+・all_change.sh、all_insert.shは特徴を加えたときは書き換える必要あり。
+・main_update.sh、all_save.sh、main_save.shは使用する表を変更するときは書き換える必要あり。
+・もしデータを削除したいのであれば、mainのdeletedをTrueに変更すること。id管理をしているので、普通に消すと悲しいことになる。
+
+----- 表作成のマニュアル -----
+・hog_create.pyを実行した後、natural_join.pyを実行すればhog特徴量が追加されたmainとshapeの表が完成する。
+・他はシェルスクリプトの実行でOK
+
+----- dense-trajectoryのマニュアル -----
+1.特徴量を取得したい動画を探す
+2./tmp/test/movie/ に動画を入れる
+3.docker_use.shを実行
+4./dense-trajectories/ に /mnt/movie/ の動画を渡す
+5./dense-trajectories/ のcommand.txtに則る
+6.生成された動画を /mnt/all_d_movie/ に移す
+7.dockerを閉じる
+8./tmp/test/all_d_movie/ から動画を手元にコピーする
+
+----- マニュアル(最終) -----
+1.new_taste_sqlalchemy.pyを実行
+2../all_save.shを実行
+3.hog_create.pyを実行
+4.new_color_create.pyを実行
+5.densetrack_create.pyを実行
+6.natural_join_csv.pyを実行
