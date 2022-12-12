@@ -6,7 +6,7 @@
 
 # coding:utf-8
 # [0]必要なライブラリのインポート
-import gym  # 倒立振子(cartpole)の実行環境
+# import gym  # 倒立振子(cartpole)の実行環境
 import numpy as np
 import random as rd
 import time
@@ -14,9 +14,10 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 from keras.utils import plot_model
-from keras.preprocessing.image import array_to_img, img_to_array, load_img
+# from keras.preprocessing.image import array_to_img, img_to_array, load_img
+from tensorflow.keras.utils import img_to_array, load_img
 from collections import deque
-from gym import wrappers  # gymの画像保存
+# from gym import wrappers  # gymの画像保存
 from keras import backend as K
 from IPython.display import clear_output
 import tensorflow as tf
@@ -27,13 +28,19 @@ import os
 import pickle
 import copy
 import glob
+from datetime import datetime
 
 from Database_test import *
 from Pre_Model import *
 
+import pandas as pd
+import codecs
+
 
 # In[2]:
 
+# 時間計測スタート #
+starttime = time.time()
 
 dir_path = './result_9/'
 os.makedirs(dir_path, exist_ok=True)
@@ -55,7 +62,8 @@ def plot_history(epochs, acc):
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.ylim([-0.02,1.02])
-    plt.savefig(dir_path + 'model_accuracy.png')
+    # plt.savefig(dir_path + 'model_accuracy.png')
+    # plt.savefig('figure_acc/figure_' + datetime.now().strftime('%Y%m%d') + '.png')
     # plt.show()
 
 
@@ -143,6 +151,13 @@ output_length = actions_length + objects_length
 
 parent_FE = get_fe(image_path) #表情一覧を取得
 
+# 親の意図を確率変数で変化させる
+noun_p = 1
+verb_p = 0
+
+# 名詞と動詞の正答を保存するDataFrame
+cols = ['nounorverb', 'ans']
+df = pd.DataFrame(index=[], columns=cols)
 
 # In[6]:
 
@@ -165,17 +180,32 @@ actor = Actor(features_length=features_length, objects_length=objects_length, ac
 
 
 for episode in range(num_episodes):
+    # 親の意図を確率変数で変化させる
+    noun_p -= 1 / num_episodes
+    verb_p += 1 / num_episodes
+
+    # 正解の場合フラグを立てる
+    correct = 0
+
     #Data.clear()
+    print('episode : ', episode)
     np.random.seed(episode)
     rand = np.random.randint(0, 65535)
     
     parent_intent = [1, 0]
-    parent_select = random.randint(0, 1)
+    # parent_select = random.randint(0, 1)
+    # 親の意図を確率変数で変化させる
+    # 0 : noun
+    # 1 : verb
+    parent_select = np.random.choice([0, 1], p=[noun_p, verb_p])
+
     if parent_select == 0:
         objectIndex = random.randint(0, len(symbols_noun)-2)
+        # noun_count += 1
     else:
         objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
         parent_intent = [0, 1]
+        # verb_count += 1
         
     infant_intent = [0, 0]
     idx = random.randint(0, 1)
@@ -218,6 +248,7 @@ for episode in range(num_episodes):
     mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
     mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
     guess = [0] # not_sureを選んだ回数
+    not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
     #parent_order = np.reshape(parent_order, [1, parent_length])
     parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
     
@@ -269,18 +300,19 @@ for episode in range(num_episodes):
         
         name = symbols[obj_name_idx - actions_length]
         obj[obj_name_idx - actions_length] = 1
-        """
         if name == 'not_sure':
-            guess[0] += 1
-        """
+            # guess[0] += 1
+            not_sure_count = 1
         
         # 報酬を設定し、与える
-        reward, reward_feature, reward_name, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), guess[0], step, max_number_of_steps,
+        reward, reward_feature, reward_name, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, max_number_of_steps,
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
         
         #act_val[obj_val_idx], act_name[obj_name_idx] = 1, 1
         
         reward = reward + reward_feature + reward_name
+
+        not_sure_count = 0 # 「分からない」フラグを元に戻す
         
         memory_in[step] = [state1.reshape(-1), state2.reshape(-1), out_1, out_2, mask1.reshape(-1), mask2.reshape(-1), obj_val_idx, reward, terminal, parent_order.reshape(-1)]
         #memory.add((state1, state2, mask1, mask2, obj_val_idx, reward, terminal)) # メモリの更新(特徴量)
@@ -307,12 +339,19 @@ for episode in range(num_episodes):
             
             
         if terminal == 1:
+            # 正解の場合フラグを立てる
+            if objectIndex == (obj_name_idx - actions_length):
+                correct = 1
             if episode % set_targetQN_interval == 0:
                 targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
                 memory_TDerror.update_TDerror(memory_episode, gamma, mainQN, targetQN)
             break
     obj_val_idx_l = np.delete(obj_val_idx_l, 0, 0) # ダミーで入れた最初の行を削除する
     obj_val_idx_list.append(obj_val_idx_l) # 毎エピソードで選択した特徴選択を保存する
+
+    record = pd.Series([parent_select, correct], index=df.columns)
+    # df = df.append(record, ignore_index=True)
+    df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
     
     
     if episode % test_epochs_interval == 0:
@@ -351,13 +390,22 @@ for episode in range(num_episodes):
     
 with open(dir_path+'+LSTM_acc.pickle', mode='wb') as f:
     pickle.dump(acc, f)
+
+# 名詞と動詞の正答率の推移をプロット
+# noun_transition : list, episodeごとに正答率を計算しappend
+# verb_transition : list, episodeごとに正答率を計算しappend
+df.to_pickle(dir_path+'acc_transition.pkl')
+
     
-plt.savefig(dir_path+'figure.png')
+plt.savefig(dir_path+'figure' + datetime.now().strftime('%Y%m%d' + '.png'))
 
 if MODEL_LOAD == False:
     os.makedirs(dir_path+'check_points/', exist_ok=True)
     mainQN.model.save_weights(dir_path+'check_points/my_checkpoint')
 
+# 時間計測の結果を出力
+print('----------------------------', file=codecs.open(dir_path+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
+print('time : ', time.time() - starttime, file=codecs.open(dir_path+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
 
 # In[ ]:
 
