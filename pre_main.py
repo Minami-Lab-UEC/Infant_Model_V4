@@ -92,7 +92,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-num_episodes = 3  # 総試行回数(episode数)
+num_episodes = 10000  # 総試行回数(episode数)
 # num_episodes = 1  # 総試行回数(episode数)
 max_number_of_steps = 5  # 1試行のstep数
 gamma = 0.99    # 割引係数
@@ -192,7 +192,7 @@ for episode in range(num_episodes):
     np.random.seed(episode)
     rand = np.random.randint(0, 65535)
     
-    parent_intent = [1, 0]
+    parent_intent = [0, 1]
     # parent_select = random.randint(0, 1)
     # 親の意図を確率変数で変化させる
     # 0 : noun
@@ -276,6 +276,7 @@ for episode in range(num_episodes):
         out[0][step] = np.reshape(out_1, [1, output_length])
         
         obj_val_idx, retTargetQs = actor.get_value(action_step_state, out, mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
+        retTargetQs = retTargetQs[retTargetQs != 0]
         print("{} retTargetQs : {}".format(step, retTargetQs))
         obj_val_idx_l = np.vstack([obj_val_idx_l, retTargetQs])
         """

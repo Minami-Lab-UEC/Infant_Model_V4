@@ -4,6 +4,7 @@ import csv
 import numpy as np
 import io
 import random
+import os
 from k_medoids import KMedoids
 import kmedoids
 from scipy.spatial.distance import pdist, squareform
@@ -12,141 +13,95 @@ from sklearn.metrics.pairwise import pairwise_distances
 
 header = []
 body = []
-trajectory_size = 180
-hog_size = 96
-hof_size = 108
-mbhx_size = 96
-mbhy_size = 96
-sample_size = 100
-data_size = 30
+TRAJECTORY_SIZE = 30
+TRAJECTORY_DIM = 11
+HOG_SIZE = 96
+HOG_DIM = 12
+HOF_SIZE = 108
+HOF_DIM = 13
+MBHX_SIZE = 96
+MBHX_DIM = 14
+MBHY_SIZE = 96
+MBHY_DIM = 15
+SAMPLE_SIZE = 100
+
+MOVIE_DIR = '../test_densetrack/'
 
 def densetrack(s):
 
     # read dense trajectories to list
-    with open(s,'r') as f:
-       d = [v.rstrip().split('\t') for v in f.readlines()]
+    d = np.load(s)
 
     # convert to float
-    d = [list(map(lambda x:float(x), d[v])) for v in range(0,len(d))]
+    d = [list(map(lambda x:x.astype(float), d[v])) for v in range(0,len(d))]
     
-    #random.seed(0)
-
-    #print(len(d))
-    #print(len(d[0]))
-    #print(d[len(d)-1][0])
-    trajectory = np.array([[0 for i in range(180)] for j in range(len(d))], dtype=float)
+    trajectory = np.zeros((len(d), TRAJECTORY_SIZE))
     for i, data in enumerate(d):
-        trajectory[i][0:180] = np.array(data[10:190], dtype=float)
-
-    """
-    # km = KMeans(n_clusters=1000, init='random')
-    
-    # km = KMedoids(n_cluster=sample_size)
-    # D = squareform(pdist(trajectory, metric='euclidean'))
-    # predicted_labels = km.fit_predict(trajectory)
-    centroids = km.cluster_centers_
-
-    print(predicted_labels)
-    """
-    
+        trajectory[i] = data[TRAJECTORY_DIM].flatten()
+  
     D = pairwise_distances(trajectory, metric='euclidean')
     
     # split into 2 clusters
-    M, C = kmedoids.kMedoids(D, sample_size, seed=0)
+    M, C = kmedoids.kMedoids(D, SAMPLE_SIZE, seed=0)
     
     M.sort()
-    #print(M)
-     
-    r_d = np.array([[0 for i in range(587)] for j in range(sample_size)], dtype=float)
+  
+    trj = np.zeros((SAMPLE_SIZE, TRAJECTORY_SIZE))
+    hog = np.zeros((SAMPLE_SIZE, HOG_SIZE))
+    hof = np.zeros((SAMPLE_SIZE, HOF_SIZE))
+    mbhx = np.zeros((SAMPLE_SIZE, MBHX_SIZE))
+    mbhy = np.zeros((SAMPLE_SIZE, MBHY_SIZE))
 
-    for i, index in enumerate(M):
-        r_d[i][10:190] = d[index][10:190]
-        r_d[i][190:286] = d[index][190:286]
-        r_d[i][286:394] = d[index][286:394]
-        r_d[i][394:490] = d[index][394:490]
-        r_d[i][490:586] = d[index][490:586]
-
-    # r_d = random.sample(d, sample_size)
-
-    """
-    #Trajectory 180dim: 2(bin) x 90(trajectory)
-    print("Trajectory:")
-    print(d[0][10:40])
-
-    #HOG 96dim: 8(bin) x 2 x 2(spatio) x 3(temporal)
-    print("HOG:")
-    print(d[0][40:40+96])
-
-    #HOF 108dim: 9(bin) x 2 x 2(spatio) x 3(temporal)
-    print("HOF:")
-    print(d[0][136:136+108])
-
-    #MBHX 96dim: 8(bin) x 2 x 2(spatio) x 3(temporal)
-    print("MBHX:")
-    print(d[0][244:244+96])
-
-    #MBHY 96dim: 8(bin) x 2 x 2(spatio) x 3(temporal)
-    print("MBHY:")
-    print(d[0][340:340+96])
-    """
-
-    trj = np.array([[0 for i in range(180)] for j in range(sample_size)], dtype=float)
-    hog = np.array([[0 for i in range(96)] for j in range(sample_size)], dtype=float)
-    hof = np.array([[0 for i in range(108)] for j in range(sample_size)], dtype=float)
-    mbhx = np.array([[0 for i in range(96)] for j in range(sample_size)], dtype=float)
-    mbhy = np.array([[0 for i in range(96)] for j in range(sample_size)], dtype=float)
-
-    for i, data in enumerate(r_d):
-        trj[i][0:180] = np.array(data[10:190], dtype=float)
-        hog[i][0:96] = np.array(data[190:286], dtype=float)
-        hof[i][0:108] = np.array(data[286:394], dtype=float)
-        mbhx[i][0:96] = np.array(data[394:490], dtype=float)
-        mbhy[i][0:96] = np.array(data[490:586], dtype=float)
+    for i, sample in enumerate(M):
+        trj[i] = d[sample][TRAJECTORY_DIM].flatten()
+        hog[i] = d[sample][HOG_DIM]
+        hof[i] = d[sample][HOF_DIM]
+        mbhx[i] = d[sample][MBHX_DIM]
+        mbhy[i] = d[sample][MBHY_DIM]
 
     return trj, hog, hof, mbhx, mbhy
 
 header.append("id")
-for i in range(sample_size):
-    for j in range(trajectory_size):
+for i in range(SAMPLE_SIZE):
+    for j in range(TRAJECTORY_SIZE):
         header.append("trajectory_" + str(i) + "_" + str(j))
-for i in range(sample_size):
-    for j in range(hog_size):
+for i in range(SAMPLE_SIZE):
+    for j in range(HOG_SIZE):
         header.append("hog_" + str(i) + "_" + str(j))
-for i in range(sample_size):
-    for j in range(hof_size):
+for i in range(SAMPLE_SIZE):
+    for j in range(HOF_SIZE):
         header.append("hof_" + str(i) + "_" + str(j))
-for i in range(sample_size):
-    for j in range(mbhx_size):
+for i in range(SAMPLE_SIZE):
+    for j in range(MBHX_SIZE):
         header.append("mbhx_" + str(i) + "_" + str(j))
-for i in range(sample_size):
-    for j in range(mbhy_size):
+for i in range(SAMPLE_SIZE):
+    for j in range(MBHY_SIZE):
         header.append("mbhy_" + str(i) + "_" + str(j))
 
-for k in range (data_size):
-    s = './all_d_movie/' + str(k)
+movie_list = os.listdir(MOVIE_DIR)
+id = 15 # 動画特徴量を追加するため途中のidから
+for m in movie_list:
+    s = MOVIE_DIR + m # 動画特徴量へのフルパス
 
     trajectory, hog, hof, mbhx, mbhy = densetrack(s)
     
-    trajectory = trajectory.flatten()
-    trajectory = np.array(trajectory, dtype=str)
-    x = np.insert(trajectory, 0, str(k))
-    hog = hog.flatten()
-    hog = np.array(hog, dtype=str)
-    x = np.insert(x, trajectory_size-1, hog)
-    hof = hof.flatten()
-    hof = np.array(hof, dtype=str)
-    x = np.insert(x, trajectory_size+hog_size-1, hof)
-    mbhx = mbhx.flatten()
-    mbhx = np.array(mbhx, dtype=str)
-    x = np.insert(x, trajectory_size+hog_size+hof_size-1, mbhx)
-    mbhy = mbhy.flatten()
-    mbhy = np.array(mbhy, dtype=str)
-    x = np.insert(x, trajectory_size+hog_size+hof_size+mbhx_size-1, mbhy)
+    trajectory = trajectory.flatten().astype(str)
+    x = np.insert(trajectory, 0, str(id)) # id + trj
+    hog = hog.flatten().astype(str)
+    x = np.insert(x, TRAJECTORY_SIZE-1, hog)
+    hof = hof.flatten().astype(str)
+    x = np.insert(x, TRAJECTORY_SIZE+HOG_SIZE-1, hof)
+    mbhx = mbhx.flatten().astype(str)
+    x = np.insert(x, TRAJECTORY_SIZE+HOG_SIZE+HOF_SIZE-1, mbhx)
+    mbhy = mbhy.flatten().astype(str)
+    x = np.insert(x, TRAJECTORY_SIZE+HOG_SIZE+HOF_SIZE+MBHX_SIZE-1, mbhy)
     body.append(x)
 
+    id += 1
 
-with open('../Investigation/bin/table_last/new_move_k_medoids_100_30.csv', 'w', newline='') as f:
+
+with open('densetrack_create_takeshita/new_move_k_medoids_100_30.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(header)
-    for i in range(data_size):
+    for i in range(len(movie_list)):
         writer.writerow(body[i])
