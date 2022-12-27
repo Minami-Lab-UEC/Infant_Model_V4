@@ -25,7 +25,7 @@ MBHY_SIZE = 96
 MBHY_DIM = 15
 SAMPLE_SIZE = 100
 
-MOVIE_DIR = '../test_densetrack/'
+MOVIE_DIR = '../track_sample_100over_select/'
 
 def densetrack(s):
 
@@ -79,7 +79,7 @@ for i in range(SAMPLE_SIZE):
         header.append("mbhy_" + str(i) + "_" + str(j))
 
 movie_list = os.listdir(MOVIE_DIR)
-id = 15 # 動画特徴量を追加するため途中のidから
+id = 30 # 動画特徴量を追加するため途中のidから
 for m in movie_list:
     s = MOVIE_DIR + m # 動画特徴量へのフルパス
 
@@ -100,7 +100,7 @@ for m in movie_list:
     id += 1
 
 
-with open('densetrack_create_takeshita/new_move_k_medoids_100_30.csv', 'w', newline='') as f:
+with open('densetrack_create_takeshita/new_move_k_medoids_100_30_1222.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     writer.writerow(header)
     for i in range(len(movie_list)):
