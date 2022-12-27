@@ -198,6 +198,8 @@ for episode in range(num_episodes):
     # 0 : noun
     # 1 : verb
     parent_select = np.random.choice([0, 1], p=[noun_p, verb_p])
+    if episode in range(6000, 6100) or episode in range(8000, 8100):
+        parent_select = 0 # 途中で名詞学習のタイミングを入れたらどうなるのか実験
 
     if parent_select == 0:
         objectIndex = random.randint(0, len(symbols_noun)-2)

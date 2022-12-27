@@ -1,10 +1,11 @@
 import pandas as pd
 
-main_df_1 = pd.read_csv('densetrack_create_takeshita/main_new.csv')
-move_df = pd.read_csv('densetrack_create_takeshita/new_move_k_medoids_100_30_1217.csv')
+main_df_1 = pd.read_csv('densetrack_create_takeshita/main_new_1219.csv')
+main_df_2 = pd.read_csv('densetrack_create_takeshita/main_new.csv')
+move_df = pd.read_csv('densetrack_create_takeshita/new_move_k_medoids_100_30_1222.csv')
 
 # 動画特徴量を追加するためデータセットを2倍のサイズにする
-main_df_2 = main_df_1.copy()
+# main_df_2 = main_df_1.copy()
 main_df = pd.concat([main_df_1, main_df_2])
 
 # # idを削除してindexを振り直す
@@ -31,4 +32,4 @@ main_df = main_df.rename(columns={'index':'id'})
 # main_df = pd.merge(main_df, move_df, on='id')
 
 # # 保存
-main_df.to_csv('densetrack_create_takeshita/main_new_1219.csv', index=False)
+main_df.to_csv('densetrack_create_takeshita/main_new_1222.csv', index=False)
