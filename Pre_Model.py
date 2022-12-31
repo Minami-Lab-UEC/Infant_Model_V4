@@ -6,7 +6,7 @@
 
 # coding:utf-8
 # [0]必要なライブラリのインポート
-import gym  # 倒立振子(cartpole)の実行環境
+# import gym  # 倒立振子(cartpole)の実行環境
 import numpy as np
 import time
 import pandas as pd
@@ -33,95 +33,48 @@ from tensorflow_addons.optimizers import RectifiedAdam
 # In[2]:
 
 
-def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request, predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
     terminal = 0 # 終了しているか否か
     reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
     reward_name = 0 # 名称選択時にきちんと親が指定した名詞or動詞に注目しているか
+
+    # test_modeはpre_main.pyでFalseにされている
     
-    if step+1 == max_step:
-        if test_mode == True:
-            if objectIndex == predict_idx:
-                reward = 1
-            else:
-                reward = -1
-        else:
-            #reward = -5
-            if objectIndex == predict_idx:
-                reward = 5
-            else:
-                reward = -3
-        terminal = 1
-    elif objectIndex == predict_idx:
-        if test_mode == True:
+    if perent_select == 0:
+        if pred_noun == ans_noun:
             reward = 1
+            terminal = 1
         else:
-            reward = 10
-        terminal = 1
-        """
-        if parent_select == 0:
-            if predict_val_idx == verb_idx:
-                reward_feature += -0.5
-            
-            if predict_val_idx != verb_idx:
-                reward_feature = 0.25
-            else:
-                reward_feature = -0.25
-            
-        else:
-            if predict_val_idx != verb_idx:
-                reward_feature += -0.5
-            
-            if predict_val_idx == verb_idx:
-                reward_feature = 0.25
-            else:
-                reward_feature = -0.25
-            """
+            if step+1 == max_step:
+                reward = -1
+                terminal = 1
+                if guess == 1:
+                    reward = -0.2
+        if pred_noun in symbols_verb:
+            reward_name = -1
+        if predict_val_idx == verb_idx:
+            reward_future = -1
     else:
-        if test_mode == False:
-            """
-            if request in requests:
-                reward= -1
+        if pred_verb == ans_verb:
+            if pred_noun == ans_noun:
+                reward = 1 # 名詞も動詞も両方正解でrewardをmaxあげる, そのエピソードの学習も終了
+                terminal = 1
             else:
-                reward = 3
-            """
-            
-            if name == "not_sure":
-                reward = -0.5
-            else:
-                reward = -5
-              
-            if parent_select == 0:
-                if symbols[predict_idx] in symbols_verb:
-                    reward_name = -1
-                if predict_val_idx == verb_idx:
-                    reward_feature = -1
-                """
-                if symbols[predict_idx] not in symbols_verb:
-                    reward_name = 0.25
-                else:
-                    reward_name = -0.25
-                if predict_val_idx != verb_idx:
-                    reward_feature = 0.25
-                else:
-                    reward_feature = -0.25
-                """
-            else:
-                if symbols[predict_idx] not in symbols_verb:
-                    reward_name = -1
-                if predict_val_idx != verb_idx:
-                    reward_feature = -1
-                """
-                if symbols[predict_idx] in symbols_verb:
-                    reward_name = 0.25
-                else:
-                    reward_name = -0.25
-                if predict_val_idx == verb_idx:
-                    reward_feature = 0.25
-                else:
-                    reward_feature = -0.25
-                """
-    
+                reward = 0.5 # 動詞が正解で、名詞が不正解なら半分rewardをあげる
+        else:
+            if pred_noun == ans_noun:
+                reward = 0.25 # 名詞だけ正解ならreward1/4あげる、動詞を当てるタスクなので少なめ
+            if step+1 == max_step:
+                reward = -1
+                terminal = 1
+                if guess == 1:
+                    reward = -0.2
+        if pred_verb not in symbols_verb:
+            reward_name = -1
+        if predict_val_idx != verb_idx:
+            reward_future = -1
+        
     return reward, reward_feature, reward_name, terminal
 
 
@@ -187,10 +140,11 @@ class QNetwork:
         #Q_all = Concatenate()([Q_F, Q_N])
         predictions = Concatenate()([Q_F, Q_N])
         
-        #predictions = Dense(output_size, activation='softmax')(Q_all)
+        # predictions = Dense(output_size, activation='softmax')(Q_all)
         mask = Input(shape=(output_size,))
-        predictions = Multiply()([predictions, mask])
-        self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=predictions)
+        predictions_noun = Multiply()([predictions, mask])
+        predictions_verb = Multiply()([predictions, mask])
+        self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=[predictions_noun, predictions_verb])
         opt = Adam(lr=learning_rate)
         #self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
         self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
@@ -198,11 +152,11 @@ class QNetwork:
         self.model.summary()
         
     def check_bias(self, data):
-        #names = [l.name for l in self.model.layers]
-        #print(names)
-        layer_name = 'tf_op_layer_Softmax'
+        names = [l.name for l in self.model.layers]
+        print(names)
+        layer_name = 'tf.nn.softmax'
         intermediate_layer_model = Model(inputs=self.model.input, outputs=self.model.get_layer(layer_name).output)
-        return intermediate_layer_model.predict(data)
+        return intermediate_layer_model(data)
 
     # 重みの学習
     def replay(self, memory, batch_size, gamma, targetQN):
@@ -244,18 +198,18 @@ class QNetwork:
                     
                     next_state_t[j+1:j+2] = next_state_b
                     next_out_vec_t[j+1:j+2] = np.reshape(next_out_b, [1, self.output_size]) 
-                    retmainQs = self.model.predict([next_state_t, next_out_vec_t, next_mask_b,  parent_order_b])
+                    retmainQs, _ = self.model([next_state_t, next_out_vec_t, next_mask_b,  parent_order_b])
                     next_action = np.argmax(retmainQs)  # 最大の報酬を返す行動を選択する
-                    target = reward_b + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][next_action]
+                    target = reward_b + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][0][next_action]
 
                 state_b = np.reshape(state_b, [1, self.state_size])
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                #targets[i][j] = self.model.predict([state, mask_b])    # Qネットワークの出力(Q値)
+                #targets[i][j] = self.model([state, mask_b])    # Qネットワークの出力(Q値)
                 #targets[i][j][action_b] = target               # 教師信号
-                #targets[i] = self.model.predict([state, mask_b])    # 怪しい
-                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b, parent_order_b])
+                #targets[i] = self.model([state, mask_b])    # 怪しい
+                targets_restore[i][j], _ = self.model([state_t, out_vec_t, mask_b, parent_order_b])
                 #targets[i][action_b] = target               # 怪しい
                 targets_restore[i][j][action_b] = target
                 
@@ -316,15 +270,15 @@ class QNetwork:
                     next_mask_b = np.reshape(next_mask_b, [1, self.output_size])
                     next_state_t[j+1:j+2] = next_state_b
                     next_out_vec_t[j+1:j+2] = np.reshape(next_out_b, [1, self.output_size]) 
-                    retmainQs = self.model.predict([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])
+                    retmainQs, _ = self.model([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])
                     next_action = np.argmax(retmainQs)  # 最大の報酬を返す行動を選択する
-                    target = reward_b + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][next_action]
+                    target = reward_b + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask_b, parent_order_b])[0][0][next_action]
 
                 state_b = np.reshape(state_b, [1, self.state_size])
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b, parent_order_b])
+                targets_restore[i][j], _ = self.model([state_t, out_vec_t, mask_b, parent_order_b])
                 targets_restore[i][j][action_b] = target
                 
             targets[i] = np.mean(targets_restore[i], axis=0)
@@ -351,6 +305,8 @@ class QNetwork:
             fea_val = [0] * self.feature_length # 特徴量の値
             requests = []
             guess = [0] # not_sureを選んだ回数
+            not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
+
             tmp_info = np.array([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
                                  np.nan, np.nan, np.nan, np.nan, np.nan], dtype=object)
             
@@ -409,7 +365,7 @@ class QNetwork:
                 out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
                 out[0][step] = np.reshape(out_1, [1, self.output_size])
                 
-                obj_val_idx = np.argmax(self.model.predict([action_step_state, out, mask1, parent_order]))# 時刻tで取得する特徴量を決定
+                obj_val_idx = np.argmax(self.model([action_step_state, out, mask1, parent_order])[0])# 時刻tで取得する特徴量を決定
                 """
                 if step != 4:
                     obj_val_idx = step
@@ -428,33 +384,39 @@ class QNetwork:
                 action_step_state[0][step+1] = state2
                 out_2 = np.concatenate([fea_vec, pre_obj_vec])
                 out[0][step+1] = np.reshape(out_2, [1, self.output_size])
-                obj_name_idx = np.argmax(self.model.predict([action_step_state, out, mask2, parent_order])) # 時刻tで取得する物体の名称を決定
+                obj_name_idx = np.argmax(self.model([action_step_state, out, mask2, parent_order])[0]) # 時刻tで取得する物体の名称を決定
 
                 name = symbols[obj_name_idx - self.action_size]
                 obj[obj_name_idx - self.action_size] = 0
                 if name == 'not_sure':
-                    guess[0] += 1
+                    # guess[0] += 1 # pre_main.pyでもコメントアウトしたため、こちらもコメントアウトすべき？
+                    not_sure_count = 1
                     
                 tmp_info[2*step+2] = name
 
                 # 報酬を設定し、与える
-                reward, _, _, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), guess[0], step, max_number_of_steps,
+                reward, _, _, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
                                                                    True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
-                
+                not_sure_count = 0
+
                 tmp_info[step+1+10] = reward
                 
                 state1 = np.concatenate([fea_vec, fea_val, obj, guess])
                 
                 if terminal:
                     if episode < (test_epochs//2):
-                        if bias_n == []:
-                            bias_n = self.check_bias(data=[action_step_state, out, mask1, parent_order])
+                        pass # biasに関する動きが意味わからんのでパス
+                        # if bias_n == []:
+                        #     bias_n = self.check_bias(data=[action_step_state, out, mask1, parent_order])
                     else:
-                        if bias_v == []:
-                            bias_v = self.check_bias(data=[action_step_state, out, mask1, parent_order])
+                        pass # biasに関する動きが意味わからんのでパス
+                        # if bias_n == []:
+                        # if bias_v == []:
+                        #     bias_v = self.check_bias(data=[action_step_state, out, mask1, parent_order])
                     #print(self.check_bias(data=[action_step_state, out, mask1, parent_order]))
                     tmp_se = pd.Series(tmp_info, index=result_df.columns, name=episode+1)
-                    result_df = result_df.append(tmp_se, ignore_index=True)
+                    # result_df = result_df.append(tmp_se, ignore_index=True) # .appendが非推奨のため
+                    result_df = pd.concat([result_df, pd.DataFrame([tmp_se])], ignore_index=True)
                     if reward == 1:
                         reward_sum += 1
                         if episode < (test_epochs//2):
@@ -465,10 +427,10 @@ class QNetwork:
         
         result_df.to_csv(dir_path+str(num_episode+1)+'_result.csv')
         
-        with open(dir_path+str(num_episode+1)+'_result.csv', 'a') as f:
-            f.write('\n')
-            f.write('noun_bias_result: [' + str(bias_n[0][0]) + ',' + str(bias_n[0][1]) + ']' + '\n')
-            f.write('verb_bias_result: [' + str(bias_v[0][0]) + ',' + str(bias_v[0][1]) + ']' + '\n')
+        # with open(dir_path+str(num_episode+1)+'_result.csv', 'a') as f:
+        #     f.write('\n')
+        #     f.write('noun_bias_result: [' + str(bias_n[0][0]) + ',' + str(bias_n[0][1]) + ']' + '\n')
+        #     f.write('verb_bias_result: [' + str(bias_v[0][0]) + ',' + str(bias_v[0][1]) + ']' + '\n')
         
         return reward_sum, reward_sum_n, reward_sum_v
 
@@ -522,16 +484,16 @@ class Memory_TDerror(Memory):
             parent_order = np.reshape(parent_order, [1, self.parent_size])
             next_state_t[j+1:j+2] = next_state
             next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
-            retmainQs = mainQN.model.predict([next_state_t,  next_out_vec_t, next_mask, parent_order])
+            retmainQs, _ = mainQN.model([next_state_t,  next_out_vec_t, next_mask, parent_order])
             next_action = np.argmax(retmainQs)
-            target = reward + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask, parent_order])[0][next_action]
+            target = reward + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])[0][0][next_action]
 
             state = np.reshape(state, [1, self.state_size])
             mask = np.reshape(mask, [1, self.output_size])
             state_t[j:j+1] = state
             out_t[j:j+1] = np.reshape(out, [1, self.output_size])
             
-            TDerror.append(target - targetQN.model.predict([state_t, out_t, mask, parent_order])[0][action])
+            TDerror.append(target - targetQN.model([state_t, out_t, mask, parent_order])[0][0][action])
         
         return sum(TDerror) / len(TDerror)
         
@@ -550,15 +512,15 @@ class Memory_TDerror(Memory):
                 parent_order = np.reshape(parent_order, [1, self.parent_size])
                 next_state_t[j+1:j+2] = next_state
                 next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
-                retmainQs = mainQN.model.predict([next_state_t, next_out_vec_t, next_mask, parent_order])
+                retmainQs, _ = mainQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])
                 next_action = np.argmax(retmainQs)
-                target = reward + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask, parent_order])[0][next_action]
+                target = reward + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])[0][0][next_action]
 
                 state = np.reshape(state, [1, self.state_size])
                 mask = np.reshape(mask, [1, self.output_size])
                 state_t[j:j+1] = state
                 out_t[j:j+1] = np.reshape(out, [1, self.output_size])
-                TDerror.append(target - targetQN.model.predict([state_t, out_t, mask, parent_order])[0][action])
+                TDerror.append(target - targetQN.model([state_t, out_t, mask, parent_order])[0][0][action])
                 
             self.buffer[i] = sum(TDerror) / len(TDerror)
             
@@ -587,7 +549,7 @@ class Actor:
         epsilon = 0.1 + 0.9 / (1.0+(episode/500))
         
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
-            retTargetQs = mainQN.model.predict([state, out, mask, parent_order])
+            retTargetQs, _ = mainQN.model([state, out, mask, parent_order])
             action = np.argmax(retTargetQs)  # 最大の報酬を返す行動を選択する
 
         else:
@@ -603,13 +565,15 @@ class Actor:
         epsilon = 0.01 + 0.99 / (1.0+episode)
         
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
-            retTargetQs = mainQN.model.predict([state, out, mask, parent_order])
-            action = np.argmax(retTargetQs)  # 最大の報酬を返す行動を選択する
+            retTargetQs_noun, retTargetQs_verb = mainQN.model([state, out, mask, parent_order])
+            action_noun = np.argmax(retTargetQs_noun)  # 最大の報酬を返す行動を選択する
+            action_verb = np.argmax(retTargetQs_verb)  # 最大の報酬を返す行動を選択する
 
         else:
-            action = random.randint(self.actions_length, self.actions_length+self.objects_length-1)  # ランダムに行動する
+            action_noun = random.randint(self.actions_length, self.actions_length+self.objects_length-1)
+            action_verb = random.randint(self.actions_length, self.actions_length+self.objects_length-1)   # ランダムに行動する
         
-        return action
+        return action_noun, action_verb
 
 
 # In[8]:
