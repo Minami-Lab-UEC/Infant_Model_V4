@@ -33,17 +33,19 @@ from tensorflow_addons.optimizers import RectifiedAdam
 # In[2]:
 
 
-def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
-    reward = 0 # 正解か不正解か
+def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select):
+    reward = 0 # 報酬
     terminal = 0 # 終了しているか否か
     reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
     reward_name = 0 # 名称選択時にきちんと親が指定した名詞or動詞に注目しているか
+    correct = 0 # 正解か不正解か
 
     # test_modeはpre_main.pyでFalseにされている
     
-    if perent_select == 0:
+    if parent_select == 0:
         if pred_noun == ans_noun:
             reward = 1
+            correct = 1
             terminal = 1
         else:
             if step+1 == max_step:
@@ -58,10 +60,13 @@ def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step,
     else:
         if pred_verb == ans_verb:
             if pred_noun == ans_noun:
-                reward = 1 # 名詞も動詞も両方正解でrewardをmaxあげる, そのエピソードの学習も終了
+                reward = 10 # 名詞も動詞も両方正解でrewardをmaxあげる, そのエピソードの学習も終了
+                correct = 1
                 terminal = 1
             else:
                 reward = 0.5 # 動詞が正解で、名詞が不正解なら半分rewardをあげる
+                if step+1 == max_step:
+                    terminal = 1
         else:
             if pred_noun == ans_noun:
                 reward = 0.25 # 名詞だけ正解ならreward1/4あげる、動詞を当てるタスクなので少なめ
@@ -75,7 +80,7 @@ def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step,
         if predict_val_idx != verb_idx:
             reward_future = -1
         
-    return reward, reward_feature, reward_name, terminal
+    return reward, reward_feature, reward_name, terminal, correct
 
 
 # In[3]:
@@ -134,16 +139,20 @@ class QNetwork:
         Q_F = Dense(action_size)(lstm)
         Q_F = softmax(Q_F)
         
-        Q_N = Dense(object_size)(lstm)
-        Q_N = softmax(Q_N)
+        Q_N_1 = Dense(object_size)(lstm)
+        Q_N_1 = softmax(Q_N_1) # 名詞用
+
+        Q_N_2 = Dense(object_size)(lstm)
+        Q_N_2 = softmax(Q_N_2) # 動詞用
         
         #Q_all = Concatenate()([Q_F, Q_N])
-        predictions = Concatenate()([Q_F, Q_N])
+        predictions_1 = Concatenate()([Q_F, Q_N_1]) # 名詞用
+        predictions_2 = Concatenate()([Q_F, Q_N_2]) # 動詞用
         
         # predictions = Dense(output_size, activation='softmax')(Q_all)
         mask = Input(shape=(output_size,))
-        predictions_noun = Multiply()([predictions, mask])
-        predictions_verb = Multiply()([predictions, mask])
+        predictions_noun = Multiply()([predictions_1, mask])
+        predictions_verb = Multiply()([predictions_2, mask])
         self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=[predictions_noun, predictions_verb])
         opt = Adam(lr=learning_rate)
         #self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
@@ -312,11 +321,14 @@ class QNetwork:
             
             parent_intent = [1, 0]
             parent_select = 0
+            objectIndex_noun = random.randint(0, len(symbols_noun)-2)
             if episode < (test_epochs//2):
-                objectIndex = random.randint(0, len(symbols_noun)-2)
+                objectIndex = objectIndex_noun
+                objectIndex_verb = objectIndex_noun
             else:
                 parent_select = 1
-                objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
+                objectIndex_verb = random.randint(len(symbols_noun)-1, len(symbols)-2)
+                objectIndex = objectIndex_verb
                 parent_intent = [0, 1]
                 
             infant_intent = [0, 0]
@@ -365,7 +377,8 @@ class QNetwork:
                 out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
                 out[0][step] = np.reshape(out_1, [1, self.output_size])
                 
-                obj_val_idx = np.argmax(self.model([action_step_state, out, mask1, parent_order])[0])# 時刻tで取得する特徴量を決定
+                retTargetQs, _ = self.model([action_step_state, out, mask1, parent_order])
+                obj_val_idx = np.argmax(retTargetQs) # 時刻tで取得する特徴量を決定
                 """
                 if step != 4:
                     obj_val_idx = step
@@ -384,19 +397,29 @@ class QNetwork:
                 action_step_state[0][step+1] = state2
                 out_2 = np.concatenate([fea_vec, pre_obj_vec])
                 out[0][step+1] = np.reshape(out_2, [1, self.output_size])
-                obj_name_idx = np.argmax(self.model([action_step_state, out, mask2, parent_order])[0]) # 時刻tで取得する物体の名称を決定
+                retTargetQs_noun, retTargetQs_verb = self.model([action_step_state, out, mask2, parent_order])
+                obj_name_idx_noun = np.argmax(retTargetQs_noun)
+                obj_name_idx_verb = np.argmax(retTargetQs_verb)
+                # 時刻tで取得する物体の名称を決定
 
-                name = symbols[obj_name_idx - self.action_size]
-                obj[obj_name_idx - self.action_size] = 0
-                if name == 'not_sure':
+                pred_noun = symbols[obj_name_idx_noun - self.action_size]
+                pred_verb = symbols[obj_name_idx_verb - self.action_size]
+                ans_noun = symbols[objectIndex_noun]
+                ans_verb = symbols[objectIndex_verb]
+                obj[obj_name_idx_noun - self.action_size] = 1
+                obj[obj_name_idx_verb - self.action_size] = 1
+                if pred_noun == 'not_sure' and pred_verb == 'not_sure':
                     # guess[0] += 1 # pre_main.pyでもコメントアウトしたため、こちらもコメントアウトすべき？
                     not_sure_count = 1
-                    
-                tmp_info[2*step+2] = name
+
+                if parent_select == 0:    
+                    tmp_info[2*step+2] = pred_noun
+                else:
+                    tmp_info[2*step+2] = pred_verb
 
                 # 報酬を設定し、与える
-                reward, _, _, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
-                                                                   True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
+                reward, _, _, terminal, _ = reward_func(pred_noun, pred_verb, ans_noun, ans_verb, not_sure_count, step, max_number_of_steps,
+                                                                   True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select)
                 not_sure_count = 0
 
                 tmp_info[step+1+10] = reward
