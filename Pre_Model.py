@@ -33,7 +33,7 @@ from tensorflow_addons.optimizers import RectifiedAdam
 # In[2]:
 
 
-def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select):
+def reward_func(pred_1, pred_2, ans_1, ans_2, guess, step, max_step, test_mode, requests,request, predict_val_idx, verb_idx, symbols, symbols_noun, symbols_verb, parent_select):
     reward = 0 # 報酬
     terminal = 0 # 終了しているか否か
     reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
@@ -41,9 +41,12 @@ def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step,
     correct = 0 # 正解か不正解か
 
     # test_modeはpre_main.pyでFalseにされている
+    # parent_select == 1のとき
+        # ans_1 : 名詞
+        # ans_2 : 動詞
     
     if parent_select == 0:
-        if pred_noun == ans_noun:
+        if pred_1 == ans_1 and pred_2 == ans_2: # どちらも正しい名詞なら正の報酬
             reward = 1
             correct = 1
             terminal = 1
@@ -51,16 +54,18 @@ def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step,
             if step+1 == max_step:
                 reward = -1
                 terminal = 1
-                if guess == 1:
+                if guess == 1: # pred_1と_2がどちらもnot_sureなら
                     reward = -0.2
-        if pred_noun in symbols_verb:
-            reward_name = -1
-        if predict_val_idx == verb_idx:
-            reward_future = -1
+                if pred_1 == ans_1 or pred_2 == ans_2: # どちらか正しい名詞なら半分の正の報酬
+                    reward = 0.5
+        # if pred_1 in symbols_verb:
+        #     reward_name = -1
+        # if predict_val_idx == verb_idx:
+        #     reward_future = -1
     else:
-        if pred_verb == ans_verb:
-            if pred_noun == ans_noun:
-                reward = 10 # 名詞も動詞も両方正解でrewardをmaxあげる, そのエピソードの学習も終了
+        if ans_2 in [pred_1, pred_2]: # pred_1と_2のどちらかで正しい動詞なら正の報酬
+            if ans_1 in [pred_1, pred_2]: 
+                reward = 10 # 名詞も動詞も両方正解で正の報酬をmaxあげる, そのエピソードの学習も終了
                 correct = 1
                 terminal = 1
             else:
@@ -68,17 +73,19 @@ def reward_func(pred_noun, pred_verb, ans_noun, ans_verb, guess, step, max_step,
                 if step+1 == max_step:
                     terminal = 1
         else:
-            if pred_noun == ans_noun:
-                reward = 0.25 # 名詞だけ正解ならreward1/4あげる、動詞を当てるタスクなので少なめ
+            if ans_1 in [pred_1, pred_2]:
+                reward = 0.25 # 名詞だけ正解なら正の報酬を1/4あげる、動詞を当てるタスクなので少なめ
             if step+1 == max_step:
                 reward = -1
                 terminal = 1
                 if guess == 1:
                     reward = -0.2
-        if pred_verb not in symbols_verb:
-            reward_name = -1
-        if predict_val_idx != verb_idx:
-            reward_future = -1
+        # if ans_1 in symbols_noun or ans_2 in symbols_noun:
+        #     reward = 0.25 # 名詞も選んでいれば正の報酬を1/4あげる
+        # if pred_2 not in symbols_verb:
+        #     reward_name = -1
+        # if predict_val_idx != verb_idx:
+        #     reward_future = -1
         
     return reward, reward_feature, reward_name, terminal, correct
 
@@ -146,14 +153,14 @@ class QNetwork:
         Q_N_2 = softmax(Q_N_2) # 動詞用
         
         #Q_all = Concatenate()([Q_F, Q_N])
-        predictions_1 = Concatenate()([Q_F, Q_N_1]) # 名詞用
-        predictions_2 = Concatenate()([Q_F, Q_N_2]) # 動詞用
+        predictions_1 = Concatenate()([Q_F, Q_N_1]) # 出力を2つ(名詞と動詞)にしたい
+        predictions_2 = Concatenate()([Q_F, Q_N_2]) # 出力を2つ(名詞と動詞)にしたい
         
         # predictions = Dense(output_size, activation='softmax')(Q_all)
         mask = Input(shape=(output_size,))
-        predictions_noun = Multiply()([predictions_1, mask])
-        predictions_verb = Multiply()([predictions_2, mask])
-        self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=[predictions_noun, predictions_verb])
+        predictions_1 = Multiply()([predictions_1, mask])
+        predictions_2 = Multiply()([predictions_2, mask])
+        self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=[predictions_1, predictions_2])
         opt = Adam(lr=learning_rate)
         #self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
         self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
@@ -321,14 +328,14 @@ class QNetwork:
             
             parent_intent = [1, 0]
             parent_select = 0
-            objectIndex_noun = random.randint(0, len(symbols_noun)-2)
+            objectIndex_1 = random.randint(0, len(symbols_noun)-2)
             if episode < (test_epochs//2):
-                objectIndex = objectIndex_noun
-                objectIndex_verb = objectIndex_noun
+                objectIndex = objectIndex_1
+                objectIndex_2 = objectIndex_1
             else:
                 parent_select = 1
-                objectIndex_verb = random.randint(len(symbols_noun)-1, len(symbols)-2)
-                objectIndex = objectIndex_verb
+                objectIndex_2 = random.randint(len(symbols_noun)-1, len(symbols)-2)
+                objectIndex = objectIndex_2
                 parent_intent = [0, 1]
                 
             infant_intent = [0, 0]
@@ -397,29 +404,29 @@ class QNetwork:
                 action_step_state[0][step+1] = state2
                 out_2 = np.concatenate([fea_vec, pre_obj_vec])
                 out[0][step+1] = np.reshape(out_2, [1, self.output_size])
-                retTargetQs_noun, retTargetQs_verb = self.model([action_step_state, out, mask2, parent_order])
-                obj_name_idx_noun = np.argmax(retTargetQs_noun)
-                obj_name_idx_verb = np.argmax(retTargetQs_verb)
+                retTargetQs_1, retTargetQs_2 = self.model([action_step_state, out, mask2, parent_order])
+                obj_name_idx_1 = np.argmax(retTargetQs_1)
+                obj_name_idx_2 = np.argmax(retTargetQs_2)
                 # 時刻tで取得する物体の名称を決定
 
-                pred_noun = symbols[obj_name_idx_noun - self.action_size]
-                pred_verb = symbols[obj_name_idx_verb - self.action_size]
-                ans_noun = symbols[objectIndex_noun]
-                ans_verb = symbols[objectIndex_verb]
-                obj[obj_name_idx_noun - self.action_size] = 1
-                obj[obj_name_idx_verb - self.action_size] = 1
-                if pred_noun == 'not_sure' and pred_verb == 'not_sure':
+                pred_1 = symbols[obj_name_idx_1 - self.action_size]
+                pred_2 = symbols[obj_name_idx_2 - self.action_size]
+                ans_1 = symbols[objectIndex_1]
+                ans_2 = symbols[objectIndex_2]
+                obj[obj_name_idx_1 - self.action_size] = 1
+                obj[obj_name_idx_2 - self.action_size] = 1
+                if pred_1 == 'not_sure' and pred_2 == 'not_sure':
                     # guess[0] += 1 # pre_main.pyでもコメントアウトしたため、こちらもコメントアウトすべき？
                     not_sure_count = 1
 
                 if parent_select == 0:    
-                    tmp_info[2*step+2] = pred_noun
+                    tmp_info[2*step+2] = pred_1
                 else:
-                    tmp_info[2*step+2] = pred_verb
+                    tmp_info[2*step+2] = pred_2
 
                 # 報酬を設定し、与える
-                reward, _, _, terminal, _ = reward_func(pred_noun, pred_verb, ans_noun, ans_verb, not_sure_count, step, max_number_of_steps,
-                                                                   True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select)
+                reward, _, _, terminal, _ = reward_func(pred_1, pred_2, ans_1, ans_2, not_sure_count, step, max_number_of_steps,
+                                                                   True, requests, request, obj_val_idx, 3, symbols, symbols_noun,symbols_verb, parent_select)
                 not_sure_count = 0
 
                 tmp_info[step+1+10] = reward
@@ -588,15 +595,15 @@ class Actor:
         epsilon = 0.01 + 0.99 / (1.0+episode)
         
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
-            retTargetQs_noun, retTargetQs_verb = mainQN.model([state, out, mask, parent_order])
-            action_noun = np.argmax(retTargetQs_noun)  # 最大の報酬を返す行動を選択する
-            action_verb = np.argmax(retTargetQs_verb)  # 最大の報酬を返す行動を選択する
+            retTargetQs_1, retTargetQs_2 = mainQN.model([state, out, mask, parent_order])
+            action_1 = np.argmax(retTargetQs_1)  # 最大の報酬を返す行動を選択する
+            action_2 = np.argmax(retTargetQs_2)  # 最大の報酬を返す行動を選択する
 
         else:
-            action_noun = random.randint(self.actions_length, self.actions_length+self.objects_length-1)
-            action_verb = random.randint(self.actions_length, self.actions_length+self.objects_length-1)   # ランダムに行動する
+            action_1 = random.randint(self.actions_length, self.actions_length+self.objects_length-1)
+            action_2 = random.randint(self.actions_length, self.actions_length+self.objects_length-1)   # ランダムに行動する
         
-        return action_noun, action_verb
+        return action_1, action_2
 
 
 # In[8]:

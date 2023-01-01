@@ -191,6 +191,8 @@ for episode in range(num_episodes):
     print('episode : ', episode)
     np.random.seed(episode)
     rand = np.random.randint(0, 65535)
+
+    pos = ['noun', 'verb']
     
     parent_intent = [0, 1]
     # parent_select = random.randint(0, 1)
@@ -201,14 +203,17 @@ for episode in range(num_episodes):
     # if episode in range(6000, 6100) or episode in range(8000, 8100):
     #     parent_select = 0 # 途中で名詞学習のタイミングを入れたらどうなるのか実験
 
-    objectIndex_noun = random.randint(0, len(symbols_noun)-2)
+    objectIndex_1 = random.randint(0, len(symbols_noun)-2)
     if parent_select == 0:
-        objectIndex = objectIndex_noun
-        objectIndex_verb = objectIndex_noun
+        objectIndex = objectIndex_1
+        objectIndex_2 = objectIndex_1
         # noun_count += 1
     else:
-        objectIndex_verb = random.randint(len(symbols_noun)-1, len(symbols)-2)
-        objectIndex = objectIndex_verb
+        if objectIndex_1 <= 1:
+            objectIndex_2 = 5 # 'apple' or 'orange'→'eat'
+        else:
+            objectIndex_2 = objectIndex_1 + 4 # 'ball'→'throw', 'book'→'read', 'block'→'stack'
+        objectIndex = objectIndex_2
         parent_intent = [0, 1]
         # verb_count += 1
         
@@ -282,7 +287,7 @@ for episode in range(num_episodes):
         
         obj_val_idx, retTargetQs = actor.get_value(action_step_state, out, mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
         retTargetQs = retTargetQs[retTargetQs != 0]
-        print("{} retTargetQs : {}".format(step, retTargetQs))
+        # print("{} retTargetQs : {}".format(step, retTargetQs))
         obj_val_idx_l = np.vstack([obj_val_idx_l, retTargetQs])
         """
         if step != 4:
@@ -300,23 +305,23 @@ for episode in range(num_episodes):
         action_step_state[0][step+1] = state2
         out_2 = np.concatenate([fea_vec, pre_obj_vec])
         out[0][step+1] = np.reshape(out_2, [1, output_length])
-        obj_name_idx_noun, obj_name_idx_verb = actor.get_name(action_step_state, out, mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
+        obj_name_idx_1, obj_name_idx_2 = actor.get_name(action_step_state, out, mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
         
         #print(obj_name_idx - actions_length)
         
-        pred_noun = symbols[obj_name_idx_noun - actions_length]
-        pred_verb = symbols[obj_name_idx_verb - actions_length]
-        ans_noun = symbols[objectIndex_noun]
-        ans_verb = symbols[objectIndex_verb]
-        obj[obj_name_idx_noun - actions_length] = 1
-        obj[obj_name_idx_verb - actions_length] = 1
-        if name == 'not_sure':
+        pred_1 = symbols[obj_name_idx_1 - actions_length]
+        pred_2 = symbols[obj_name_idx_2 - actions_length]
+        ans_1 = symbols[objectIndex_1]
+        ans_2 = symbols[objectIndex_2]
+        obj[obj_name_idx_1 - actions_length] = 1
+        obj[obj_name_idx_2 - actions_length] = 1
+        if pred_1 == 'not_sure' and pred_2 == 'not_sure':
             # guess[0] += 1
             not_sure_count = 1
         
         # 報酬を設定し、与える
-        reward, reward_feature, reward_name, terminal = reward_func(pred_noun, pred_verb, ans_noun, ans_verb, not_sure_count, step, max_number_of_steps,
-                                                                    False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
+        reward, reward_feature, reward_name, terminal, correct = reward_func(pred_1, pred_2, ans_1, ans_2, not_sure_count, step, max_number_of_steps,
+                                                                    False, requests, request, obj_val_idx, 3, symbols, symbols_noun, symbols_verb, parent_select)
         
         #act_val[obj_val_idx], act_name[obj_name_idx] = 1, 1
         
@@ -330,7 +335,10 @@ for episode in range(num_episodes):
         state1 = np.concatenate([fea_vec, fea_val, obj, guess])
         next_out = fea_vec+obj
         
-        memory_in[step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward, terminal, parent_order.reshape(-1)]
+        if parent_select == 0:
+            memory_in[step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx_1, reward, terminal, parent_order.reshape(-1)]
+        else:
+            memory_in[step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx_2, reward, terminal, parent_order.reshape(-1)]
         
         memory_step.add(memory_in)
         
@@ -346,12 +354,16 @@ for episode in range(num_episodes):
                 history = mainQN.replay(memory_episode, batch_size, gamma, targetQN)
         else:
             history = mainQN.replay(memory_step, 1, gamma, targetQN)
-            
+
+        if step+1 == max_number_of_steps:
+            if terminal == 0:
+                print('terminal : ', terminal)
+                print(f'[{pos[parent_select]}] predict : {pred_1}-{pred_2}, ans : {ans_1}-{ans_2}')
+                print('reward :', reward, reward_feature, reward_name)  
             
         if terminal == 1:
-            # 正解の場合フラグを立てる
-            if objectIndex == (obj_name_idx - actions_length):
-                correct = 1
+            print(f'[{pos[parent_select]}] predict : {pred_1}-{pred_2}, ans : {ans_1}-{ans_2}')
+            print(f'reward : {reward}')
             if episode % set_targetQN_interval == 0:
                 targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
                 memory_TDerror.update_TDerror(memory_episode, gamma, mainQN, targetQN)
