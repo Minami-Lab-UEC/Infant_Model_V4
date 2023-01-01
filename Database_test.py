@@ -38,8 +38,8 @@ use_verb = True
 class Database():
     def __init__(self, div_size):
         global use_color, use_size, use_shape, use_taste, use_hardness, use_move, use_verb
-        self.data = pd.read_csv("./table/main_new.csv", index_col=0)
-        self.verb = pd.read_csv("./table/verb.csv", index_col=0)
+        self.data = pd.read_csv("./make_table-master/densetrack_create_takeshita/main_new_1222.csv", index_col=0)
+        self.verb = pd.read_csv("./make_table-master/densetrack_create_takeshita/verb.csv", index_col=0)
         self.request = []
         self.object = self.data.index
         self.feature_length = 0
@@ -57,7 +57,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.color = color_all.iloc[:,important_index[:20]]
             if len(color_all.columns) <= 50:
@@ -78,7 +78,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.shape = shape_all.iloc[:,important_index[:20]]
             if len(shape_all.columns) <= 50:
@@ -99,7 +99,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.taste = taste_all.iloc[:,important_index[:20]]
             if len(taste_all.columns) <= 50:
@@ -115,12 +115,12 @@ class Database():
         else:
             self.taste_size = 0
         if(use_move):
-            move_all = pd.read_csv("./table/new_move_k_medoids_100.csv", index_col=0)
+            move_all = pd.read_csv("./make_table-master/densetrack_create_takeshita/new_move_k_medoids_100_30_1222.csv", index_col=0)
             feature_list = move_all.values.tolist()
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.move = move_all.iloc[:,important_index[:20]]
             if len(move_all.columns) <= 50:
@@ -136,7 +136,7 @@ class Database():
         else:
             self.move_size = 0
         if(use_verb):
-            verb_list = pd.read_csv("./table/verb.csv", index_col=0)
+            verb_list = pd.read_csv("./make_table-master/densetrack_create_takeshita/verb.csv", index_col=0)
             self.name_verb = list(dict.fromkeys(verb_list['name']))
             for data in self.name_verb:
                 self.name.append(data)
@@ -152,7 +152,7 @@ class Database():
             self.request.append(request)
         """
         random.seed(rand)
-        get_number = random.randint(object_number, object_number+2) # 同種の中からランダムに特徴を与える(オレンジならオレンジ3種類の中から)
+        get_number = random.randint(object_number, object_number + 2) # 同種の中からランダムに特徴を与える(オレンジならオレンジ3種類の中から)
         base =  np.zeros(self.feature_length)
         if parent_order == 0:
             if get_number >= len(self.data):
@@ -165,6 +165,7 @@ class Database():
             if get_number >= len(self.data):
                 return base
             objFeatures = self.data.loc[get_number]
+        # print('get features : ', {self.data.loc[get_number]['name']})
         #objFeatures = self.data.loc[object_number]
         #base =  np.zeros(self.feature_length)
         k1 = self.color_size
