@@ -57,7 +57,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.color = color_all.iloc[:,important_index[:20]]
             if len(color_all.columns) <= 50:
@@ -78,7 +78,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.shape = shape_all.iloc[:,important_index[:20]]
             if len(shape_all.columns) <= 50:
@@ -99,7 +99,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.taste = taste_all.iloc[:,important_index[:20]]
             if len(taste_all.columns) <= 50:
@@ -120,7 +120,7 @@ class Database():
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
 
-            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_)),
+            important_index = [i for importance, i in sorted(zip(rfc.feature_importances_, range(rfc.n_features_in_)),
                                                              key=lambda x:x[0], reverse=True)]
             #self.move = move_all.iloc[:,important_index[:20]]
             if len(move_all.columns) <= 50:
