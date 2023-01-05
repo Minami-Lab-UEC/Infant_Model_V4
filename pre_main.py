@@ -92,43 +92,43 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-num_episodes = 10000  # 総試行回数(episode数)
-# num_episodes = 1  # 総試行回数(episode数)
-max_number_of_steps = 5  # 1試行のstep数
-gamma = 0.99    # 割引係数
-islearned = False  # 学習が終わったフラグ
-isrender = False  # 描画フラグ
+NUM_EPISODES = 10000  # 総試行回数(episode数)
+# NUM_EPISODES = 1  # 総試行回数(episode数)
+MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
+GAMMA = 0.99    # 割引係数
+ISLEARNED = False  # 学習が終わったフラグ
+ISRENDER = False  # 描画フラグ
 acc = []
 epochs = []
 # ---
-#hidden_size = 1536               # LSTMの隠れ層のニューロンの数
-#hidden_size = 64
-"""hidden_size = 48"""
-hidden_size = 1024
-#hidden_size = 256
-#embedding_size = 2048 # データの圧縮次元数
-#embedding_size = 512
-"""embedding_size = 256"""
-embedding_size = 2048
-"""hidden_size_2 = 32"""
-hidden_size_2 = 512
-learning_rate = 0.00001         # Q-networkの学習係数
-memory_size = 96            # バッファーメモリの大きさ
-batch_size = 64                # Q-networkを更新するバッチの大記載
-test_epochs_interval = 50 # 何エポック毎にテストするか
-test_epochs = 50 # テスト回数
-prioritized_mode_border = 0.3 # prioritized experience replayに入る正答率
-set_targetQN_interval = 10 # 何エピソードでmainQNとtargetQNを同期するか
+#HIDDEN_SIZE = 1536               # LSTMの隠れ層のニューロンの数
+#HIDDEN_SIZE = 64
+"""HIDDEN_SIZE = 48"""
+HIDDEN_SIZE = 1024
+#HIDDEN_SIZE = 256
+#EMBEDDING_SIZE = 2048 # データの圧縮次元数
+#EMBEDDING_SIZE = 512
+"""EMBEDDING_SIZE = 256"""
+EMBEDDING_SIZE = 2048
+"""HIDDEN_SIZE_2 = 32"""
+HIDDEN_SIZE_2 = 512
+LEARNING_RATE = 0.00001         # Q-networkの学習係数
+MEMORY_SIZE = 96            # バッファーメモリの大きさ
+BATCH_SIZE = 64                # Q-networkを更新するバッチの大記載
+TEST_EPOCHS_INTERVAL = 50 # 何エポック毎にテストするか
+TEST_EPOCHS = 50 # テスト回数
+PRIORITIZED_MODE_BORDER = 0.3 # prioritized experience replayに入る正答率
+SET_TARGETQN_INTERVAL = 10 # 何エピソードでmainQNとtargetQNを同期するか
 reward_sum_n = 1 # 名詞の正解数
 reward_sum_v = 1 # 動詞の正解数
-div_size = 1 # 特徴量の分割サイズ
-per_error = 1.0
+DIV_SIZE = 1 # 特徴量の分割サイズ
+PER_ERROR = 1.0
 
-p_hidden_size = 32
+P_HIDDEN_SIZE = 32
 
-#p_hidden_size = 32 # 親の特徴量に対する隠れ層のユニット数
+#P_HIDDEN_SIZE = 32 # 親の特徴量に対する隠れ層のユニット数
 
-Data = Database(div_size)
+Data = Database(DIV_SIZE)
 
 obj_val_idx_list = [] # 特徴選択の推移を見るため、特徴選択を保存するリストを用意する
 
@@ -162,27 +162,27 @@ df = pd.DataFrame(index=[], columns=cols)
 # In[6]:
 
 
-mainQN = QNetwork(hidden_size=hidden_size, state_size=state_length, step_size=max_number_of_steps, action_size=actions_length, 
-                  object_size=objects_length, output_size=output_length, parent_size=parent_length, feature_size=features_length, embedding_size=embedding_size, 
-                  learning_rate=learning_rate, hidden_size_2=hidden_size_2,  p_hidden_size=p_hidden_size)     # メインのQネットワーク
-targetQN = QNetwork(hidden_size=hidden_size, state_size=state_length, step_size=max_number_of_steps, action_size=actions_length, 
-                    object_size=objects_length, output_size=output_length, parent_size=parent_length, feature_size=features_length, embedding_size=embedding_size,
-                    learning_rate=learning_rate, hidden_size_2=hidden_size_2, p_hidden_size=p_hidden_size)   # 価値を計算するQネットワーク
+mainQN = QNetwork(hidden_size=HIDDEN_SIZE, state_size=state_length, step_size=MAX_NUMBER_OF_STEPS, action_size=actions_length, 
+                  object_size=objects_length, output_size=output_length, parent_size=parent_length, feature_size=features_length, embedding_size=EMBEDDING_SIZE, 
+                  learning_rate=LEARNING_RATE, hidden_size_2=HIDDEN_SIZE_2,  p_hidden_size=P_HIDDEN_SIZE)     # メインのQネットワーク
+targetQN = QNetwork(hidden_size=HIDDEN_SIZE, state_size=state_length, step_size=MAX_NUMBER_OF_STEPS, action_size=actions_length, 
+                    object_size=objects_length, output_size=output_length, parent_size=parent_length, feature_size=features_length, embedding_size=EMBEDDING_SIZE,
+                    learning_rate=LEARNING_RATE, hidden_size_2=HIDDEN_SIZE_2, p_hidden_size=P_HIDDEN_SIZE)   # 価値を計算するQネットワーク
 # plot_model(mainQN.model, to_file='Qnetwork.png', show_shapes=True)        # Qネットワークの可視化
-memory_episode = Memory(max_size=memory_size)
+memory_episode = Memory(max_size=MEMORY_SIZE)
 memory_step = Memory(max_size=1)
-memory = Memory(max_size=memory_size)
-memory_TDerror = Memory_TDerror(max_size=memory_size, state_size=state_length, output_size=output_length, step_size=max_number_of_steps, parent_size=parent_length)
+memory = Memory(max_size=MEMORY_SIZE)
+memory_TDerror = Memory_TDerror(max_size=MEMORY_SIZE, state_size=state_length, output_size=output_length, step_size=MAX_NUMBER_OF_STEPS, parent_size=parent_length)
 actor = Actor(features_length=features_length, objects_length=objects_length, actions_length=actions_length, output_size=output_length, MODEL_LOAD=MODEL_LOAD)
 
 
 # In[ ]:
 
 
-for episode in range(num_episodes):
+for episode in range(NUM_EPISODES):
     # 親の意図を確率変数で変化させる
-    noun_p -= 1 / num_episodes
-    verb_p += 1 / num_episodes
+    noun_p -= 1 / NUM_EPISODES
+    verb_p += 1 / NUM_EPISODES
 
     # 正解の場合フラグを立てる
     correct = 0
@@ -198,17 +198,14 @@ for episode in range(num_episodes):
     # 0 : noun
     # 1 : verb
     parent_select = np.random.choice([0, 1], p=[noun_p, verb_p])
-    # if episode in range(6000, 6100) or episode in range(8000, 8100):
-    #     parent_select = 0 # 途中で名詞学習のタイミングを入れたらどうなるのか実験
+    if episode in range(6000, 6100) or episode in range(8000, 8100):
+        parent_select = 0 # 途中で名詞学習のタイミングを入れたらどうなるのか実験
 
-    objectIndex_noun = random.randint(0, len(symbols_noun)-2)
     if parent_select == 0:
-        objectIndex = objectIndex_noun
-        objectIndex_verb = objectIndex_noun
+        objectIndex = random.randint(0, len(symbols_noun)-2)
         # noun_count += 1
     else:
-        objectIndex_verb = random.randint(len(symbols_noun)-1, len(symbols)-2)
-        objectIndex = objectIndex_verb
+        objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
         parent_intent = [0, 1]
         # verb_count += 1
         
@@ -235,11 +232,11 @@ for episode in range(num_episodes):
         parent_select = np.random.binomial(1, reward_sum_n/(reward_sum_n+reward_sum_v), 1)
     if parent_select == 0:
         objectIndex = random.randint(0, len(symbols_noun)-2)
-        if per_error < np.random.uniform(0, 1):
+        if PER_ERROR < np.random.uniform(0, 1):
             parent_order = [0, 1]
     else:
         objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
-        if per_error < np.random.uniform(0, 1):
+        if PER_ERROR < np.random.uniform(0, 1):
             parent_order = [1, 0]
         else:
             parent_order = [0, 1]
@@ -259,17 +256,17 @@ for episode in range(num_episodes):
     
     memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
                    [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
-    memory_in = [memory_none] * 2 * max_number_of_steps
+    memory_in = [memory_none] * 2 * MAX_NUMBER_OF_STEPS
     
-    action_step_state = np.zeros((1, 2 * max_number_of_steps, state_length))
-    out = np.zeros((1, 2 * max_number_of_steps, output_length))
+    action_step_state = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, state_length))
+    out = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, output_length))
     
     #print(str(episode)+' episode start.')
     
     # obj_val_idx_list.append(obj_val_idx_l) # 毎エピソードで選択した特徴選択を保存する
     obj_val_idx_l = np.array([0] * actions_length) # エピソード内のステップごとに選択した特徴選択を保存する
 
-    for step in range(max_number_of_steps):
+    for step in range(MAX_NUMBER_OF_STEPS):
         pre_fea_vec = copy.deepcopy(fea_vec)
         pre_obj_vec = copy.deepcopy(obj)
         #fea_val = [0] * features_length # 特徴量の値
@@ -282,7 +279,7 @@ for episode in range(num_episodes):
         
         obj_val_idx, retTargetQs = actor.get_value(action_step_state, out, mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
         retTargetQs = retTargetQs[retTargetQs != 0]
-        print("{} retTargetQs : {}".format(step, retTargetQs))
+        # print("{} retTargetQs : {}".format(step, retTargetQs))
         obj_val_idx_l = np.vstack([obj_val_idx_l, retTargetQs])
         """
         if step != 4:
@@ -300,22 +297,18 @@ for episode in range(num_episodes):
         action_step_state[0][step+1] = state2
         out_2 = np.concatenate([fea_vec, pre_obj_vec])
         out[0][step+1] = np.reshape(out_2, [1, output_length])
-        obj_name_idx_noun, obj_name_idx_verb = actor.get_name(action_step_state, out, mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
+        obj_name_idx = actor.get_name(action_step_state, out, mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
         
         #print(obj_name_idx - actions_length)
         
-        pred_noun = symbols[obj_name_idx_noun - actions_length]
-        pred_verb = symbols[obj_name_idx_verb - actions_length]
-        ans_noun = symbols[objectIndex_noun]
-        ans_verb = symbols[objectIndex_verb]
-        obj[obj_name_idx_noun - actions_length] = 1
-        obj[obj_name_idx_verb - actions_length] = 1
+        name = symbols[obj_name_idx - actions_length]
+        obj[obj_name_idx - actions_length] = 1
         if name == 'not_sure':
             # guess[0] += 1
             not_sure_count = 1
         
         # 報酬を設定し、与える
-        reward, reward_feature, reward_name, terminal = reward_func(pred_noun, pred_verb, ans_noun, ans_verb, not_sure_count, step, max_number_of_steps,
+        reward, reward_feature, reward_name, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
         
         #act_val[obj_val_idx], act_name[obj_name_idx] = 1, 1
@@ -336,25 +329,25 @@ for episode in range(num_episodes):
         
         #memory.add((state2, state1, mask2, mask1, obj_name_idx, reward, terminal)) # メモリの更新(物体の名称)
         
-        if (memory_episode.len() > batch_size) and terminal == 1:
+        if (memory_episode.len() > BATCH_SIZE) and terminal == 1:
             if PER_MODE == True:
                 memory_episode.add(memory_in)
-                TDerror = memory_TDerror.get_TDerror(memory_episode, gamma, mainQN, targetQN)
+                TDerror = memory_TDerror.get_TDerror(memory_episode, GAMMA, mainQN, targetQN)
                 memory_TDerror.add(TDerror)
-                history = mainQN.prioritized_experience_replay(memory_episode, batch_size, gamma, targetQN, memory_TDerror)
+                history = mainQN.prioritized_experience_replay(memory_episode, BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
             else:
-                history = mainQN.replay(memory_episode, batch_size, gamma, targetQN)
+                history = mainQN.replay(memory_episode, BATCH_SIZE, GAMMA, targetQN)
         else:
-            history = mainQN.replay(memory_step, 1, gamma, targetQN)
+            history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
             
             
         if terminal == 1:
             # 正解の場合フラグを立てる
             if objectIndex == (obj_name_idx - actions_length):
                 correct = 1
-            if episode % set_targetQN_interval == 0:
+            if episode % SET_TARGETQN_INTERVAL == 0:
                 targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
-                memory_TDerror.update_TDerror(memory_episode, gamma, mainQN, targetQN)
+                memory_TDerror.update_TDerror(memory_episode, GAMMA, mainQN, targetQN)
             break
     obj_val_idx_l = np.delete(obj_val_idx_l, 0, 0) # ダミーで入れた最初の行を削除する
     obj_val_idx_list.append(obj_val_idx_l) # 毎エピソードで選択した特徴選択を保存する
@@ -364,18 +357,18 @@ for episode in range(num_episodes):
     df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
     
     
-    if episode % test_epochs_interval == 0:
+    if episode % TEST_EPOCHS_INTERVAL == 0:
         reward_sum, reward_sum_n, reward_sum_v = mainQN.test(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
-                                                     mask1, mask2, test_epochs, max_number_of_steps, episode, dir_path,
-                                                            per_error, parent_FE)
+                                                     mask1, mask2, TEST_EPOCHS, MAX_NUMBER_OF_STEPS, episode, dir_path,
+                                                            PER_ERROR, parent_FE)
         if len(epochs) == 0:
             epoch = 0
         else:
-            epoch = max(epochs) + test_epochs
-        acc.append(reward_sum/(test_epochs))
+            epoch = max(epochs) + TEST_EPOCHS
+        acc.append(reward_sum/(TEST_EPOCHS))
         epochs.append(epoch)
         
-        if acc[-1] >= prioritized_mode_border:
+        if acc[-1] >= PRIORITIZED_MODE_BORDER:
             PER_MODE = True
         
         plot_history(epochs, acc)

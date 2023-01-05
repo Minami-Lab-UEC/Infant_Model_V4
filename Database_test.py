@@ -38,8 +38,8 @@ use_verb = True
 class Database():
     def __init__(self, div_size):
         global use_color, use_size, use_shape, use_taste, use_hardness, use_move, use_verb
-        self.data = pd.read_csv("./table/main_new.csv", index_col=0)
-        self.verb = pd.read_csv("./table/verb.csv", index_col=0)
+        self.data = pd.read_csv("./make_table-master/densetrack_create_takeshita/main_new_1222.csv", index_col=0)
+        self.verb = pd.read_csv("./make_table-master/densetrack_create_takeshita/verb.csv", index_col=0)
         self.request = []
         self.object = self.data.index
         self.feature_length = 0
@@ -115,7 +115,7 @@ class Database():
         else:
             self.taste_size = 0
         if(use_move):
-            move_all = pd.read_csv("./table/new_move_k_medoids_100.csv", index_col=0)
+            move_all = pd.read_csv("./make_table-master/densetrack_create_takeshita/new_move_k_medoids_100_30_1222.csv", index_col=0)
             feature_list = move_all.values.tolist()
             rfc = RFC(random_state=0)
             rfc.fit(feature_list, obj_list)
@@ -136,7 +136,7 @@ class Database():
         else:
             self.move_size = 0
         if(use_verb):
-            verb_list = pd.read_csv("./table/verb.csv", index_col=0)
+            verb_list = pd.read_csv("./make_table-master/densetrack_create_takeshita/verb.csv", index_col=0)
             self.name_verb = list(dict.fromkeys(verb_list['name']))
             for data in self.name_verb:
                 self.name.append(data)
