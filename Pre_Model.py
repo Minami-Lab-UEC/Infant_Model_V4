@@ -154,7 +154,7 @@ class QNetwork:
         mask = Input(shape=(output_size,))
         predictions = Multiply()([predictions, mask])
         self.model = Model(inputs=[inputs, out, mask, parent_order], outputs=predictions)
-        opt = Adam(lr=learning_rate)
+        opt = Adam(learning_rate=learning_rate)
         #self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
         self.model.compile(loss=loss_func, optimizer=opt, metrics=['accuracy'])
         
