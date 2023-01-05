@@ -152,6 +152,7 @@ output_length = actions_length + objects_length
 parent_FE = get_fe(image_path) #表情一覧を取得
 
 # 親の意図を確率変数で変化させる
+pos = ['noun', 'verb']
 noun_p = 1
 verb_p = 0
 
@@ -343,6 +344,7 @@ for episode in range(NUM_EPISODES):
             
         if terminal == 1:
             # 正解の場合フラグを立てる
+            print(f'[{pos[parent_select]}] predict : {name}, ans : {symbols[objectIndex]}')
             if objectIndex == (obj_name_idx - actions_length):
                 correct = 1
             if episode % SET_TARGETQN_INTERVAL == 0:
