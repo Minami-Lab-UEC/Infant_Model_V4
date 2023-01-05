@@ -30,65 +30,41 @@ from tensorflow_addons.activations import mish
 from tensorflow_addons.optimizers import RectifiedAdam
 
 
-# In[2]:
+def reward_func_onlynoun(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+    reward = 0 # 正解か不正解か
+    terminal = 0 # 終了しているか否か
 
+    # test_modeはpre_main.pyでFalseにされている
+
+    if objectIndex == predict_idx:
+        reward = 1
+        terminal = 1
+    else:
+        reward = -1
+        if guess == 1:
+            reward = -0.2
+    
+    if step+1 == max_step:
+        terminal = 1
+    
+    return reward, terminal
 
 def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
-    terminal = 0 # 終了しているか否か
-    reward_feature = 0 # 特徴選択時にきちんと親が指定した物体or動作に注目しているか
-    reward_name = 0 # 名称選択時にきちんと親が指定した名詞or動詞に注目しているか
-
+    terminal = [0, 0]
     # test_modeはpre_main.pyでFalseにされている
-    
-    if step+1 == max_step:
-        if test_mode == True:
-            if objectIndex == predict_idx:
-                reward = 1
-            else:
-                reward = -1
-        else:
-            if objectIndex == predict_idx:
-                reward = 1
-            else:
-                reward = -1
-                if guess == 1:
-                    reward = -0.2
-        terminal = 1
-    elif objectIndex == predict_idx:
-        if test_mode == True:
-            reward = 1
-        else:
-            reward = 1
-        terminal = 1
 
+    if objectIndex == predict_idx:
+        reward = 1
+        terminal[parent_select] = 1 
     else:
-        if test_mode == False:           
-            # if name == "not_sure":
-            #     reward = -0.5
-            # else:
-            #     reward = -5
-            reward = -1
-            if guess == 1:
-                reward = -0.2
-
-            # 親の意図との関わりについて報酬設計している？               
-            if parent_select == 0:
-                if symbols[predict_idx] in symbols_verb:
-                    reward_name = -1
-                if predict_val_idx == verb_idx:
-                    reward_feature = -1
-
-            else:
-                if symbols[predict_idx] not in symbols_verb:
-                    reward_name = -1
-                if predict_val_idx != verb_idx:
-                    reward_feature = -1
+        reward = -1
+        if guess == 1:
+            reward = -0.2
+    if step+1 == max_step:
+        terminal[parent_select] = 1 
     
-    return reward, reward_feature, reward_name, terminal
-
-
-# In[3]:
+    return reward, terminal
 
 
 def loss_func(y_true, y_pred):
@@ -97,9 +73,6 @@ def loss_func(y_true, y_pred):
     linear_part = error - quadratic_part
     loss = tf.reduce_sum(0.5 * tf.square(quadratic_part) + linear_part)
     return loss
-
-
-# In[4]:
 
 
 # [2]Q関数をディープラーニングのネットワークをクラスとして定義
@@ -301,12 +274,6 @@ class QNetwork:
         reward_sum_n = 0
         reward_sum_v = 0
         
-        bias_n = []
-        bias_v = []
-        
-        result_df = pd.DataFrame(columns=['ans','fea_1','name_1','fea_2','name_2','fea_3','name_3','fea_4','name_4','fea_5','name_5',
-                                              'reward_1', 'reward_2', 'reward_3', 'reward_4', 'reward_5'], dtype=object)
-        
         for episode in range(test_epochs):
             rand = np.random.randint(0, 65535)
             obj = [0] * self.object_size
@@ -315,9 +282,6 @@ class QNetwork:
             requests = []
             guess = [0] # not_sureを選んだ回数
             not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
-
-            tmp_info = np.array([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
-                                 np.nan, np.nan, np.nan, np.nan, np.nan], dtype=object)
             
             parent_intent = [1, 0]
             parent_select = 0
@@ -340,27 +304,7 @@ class QNetwork:
             else:
                 idx = random.randint(0, 5)
                 parent_order = parent_FE[idx]
-                #parent_order[idx] = 1
-            
-            """
-            parent_order = [1, 0] # 親が名詞か動詞のどちらを選んだか
-            objectIndex = random.randint(0, self.object_size-1) # 当ててほしい物体のindex
-            
-            parent_select = 0
-            if episode < (test_epochs//2):
-                objectIndex = random.randint(0, len(symbols_noun)-2)
-                if per_error <= np.random.uniform(0, 1):
-                    parent_order = [0, 1]
-            else:
-                parent_select = 1
-                objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
-                if per_error <= np.random.uniform(0, 1):
-                    parent_order = [1, 0]
-                else:
-                    parent_order = [0, 1]
-            """
-            #objectIndex = random.randint(0, self.object_size-1) # 当ててほしい物体のindex
-            tmp_info[0] = symbols[objectIndex]
+
             action_step_state = action_step_state = np.zeros((1, 2*self.step_size, self.state_size))
             out = np.zeros((1, 2*self.step_size, self.output_size))
             parent_order = np.reshape(parent_order, [1, self.parent_size, self.parent_size, 1])
@@ -375,13 +319,6 @@ class QNetwork:
                 out[0][step] = np.reshape(out_1, [1, self.output_size])
                 
                 obj_val_idx = np.argmax(self.model([action_step_state, out, mask1, parent_order]))# 時刻tで取得する特徴量を決定
-                """
-                if step != 4:
-                    obj_val_idx = step
-                else:
-                    obj_val_idx = 3
-                """
-                tmp_info[2*step+1] = actions[obj_val_idx]
 
                 fea_vec[obj_val_idx] = 1
                 request = actions[obj_val_idx]
@@ -398,34 +335,16 @@ class QNetwork:
                 name = symbols[obj_name_idx - self.action_size]
                 obj[obj_name_idx - self.action_size] = 0
                 if name == 'not_sure':
-                    # guess[0] += 1 # pre_main.pyでもコメントアウトしたため、こちらもコメントアウトすべき？
                     not_sure_count = 1
-                    
-                tmp_info[2*step+2] = name
 
                 # 報酬を設定し、与える
-                reward, _, _, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
+                reward, terminal = reward_func(objectIndex, (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
                                                                    True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
                 not_sure_count = 0
-
-                tmp_info[step+1+10] = reward
                 
                 state1 = np.concatenate([fea_vec, fea_val, obj, guess])
                 
                 if terminal:
-                    if episode < (test_epochs//2):
-                        pass # biasに関する動きが意味わからんのでパス
-                        # if bias_n == []:
-                        #     bias_n = self.check_bias(data=[action_step_state, out, mask1, parent_order])
-                    else:
-                        pass # biasに関する動きが意味わからんのでパス
-                        # if bias_n == []:
-                        # if bias_v == []:
-                        #     bias_v = self.check_bias(data=[action_step_state, out, mask1, parent_order])
-                    #print(self.check_bias(data=[action_step_state, out, mask1, parent_order]))
-                    tmp_se = pd.Series(tmp_info, index=result_df.columns, name=episode+1)
-                    # result_df = result_df.append(tmp_se, ignore_index=True) # .appendが非推奨のため
-                    result_df = pd.concat([result_df, pd.DataFrame([tmp_se])], ignore_index=True)
                     if reward == 1:
                         reward_sum += 1
                         if episode < (test_epochs//2):
@@ -434,17 +353,7 @@ class QNetwork:
                             reward_sum_v += 1
                         break
         
-        result_df.to_csv(dir_path+str(num_episode+1)+'_result.csv')
-        
-        # with open(dir_path+str(num_episode+1)+'_result.csv', 'a') as f:
-        #     f.write('\n')
-        #     f.write('noun_bias_result: [' + str(bias_n[0][0]) + ',' + str(bias_n[0][1]) + ']' + '\n')
-        #     f.write('verb_bias_result: [' + str(bias_v[0][0]) + ',' + str(bias_v[0][1]) + ']' + '\n')
-        
         return reward_sum, reward_sum_n, reward_sum_v
-
-
-# In[5]:
 
 
 # [3]Experience ReplayとFixed Target Q-Networkを実現するメモリクラス
@@ -465,9 +374,6 @@ class Memory:
 
     def len(self):
         return len(self.buffer)
-
-
-# In[6]:
 
 
 class Memory_TDerror(Memory):

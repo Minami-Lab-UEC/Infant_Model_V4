@@ -358,29 +358,31 @@ for episode in range(NUM_EPISODES):
     ans_noun_verb = []
 
     # step終了を判断する変数
-    terminal = 0
+    # terminal = [0, 0]
+    
+    act_val = np.zeros(output_length)
+    act_name = np.zeros(output_length)
+    obj = [0] * objects_length
+    fea_vec = [0] * actions_length # 特徴の種類
+    fea_val = [0] * features_length # 特徴量の値
+    # requests = []
+    mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
+    mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
+    guess = [0] # not_sureを選んだ回数
+    not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
+    #parent_order = np.reshape(parent_order, [1, parent_length])
+    parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
+            
+    memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
+        [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
+    
+    # 名詞と動詞を入れるためのメモリを用意するため、リストを倍にする
+    memory_in = [[memory_none] * 2 * MAX_NUMBER_OF_STEPS] * MAX_NUMBER_OF_LOOPS
+            
+    action_step_state = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, state_length))
+    out = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, output_length))
     
     for step in range(MAX_NUMBER_OF_STEPS):
-        act_val = np.zeros(output_length)
-        act_name = np.zeros(output_length)
-        obj = [0] * objects_length
-        fea_vec = [0] * actions_length # 特徴の種類
-        fea_val = [0] * features_length # 特徴量の値
-        # requests = []
-        mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
-        mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
-        guess = [0] # not_sureを選んだ回数
-        not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
-        #parent_order = np.reshape(parent_order, [1, parent_length])
-        parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
-            
-        memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
-            [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
-        memory_in = [memory_none] * 2 * MAX_NUMBER_OF_STEPS
-            
-        action_step_state = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, state_length))
-        out = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, output_length))
-
         for loop in range(MAX_NUMBER_OF_LOOPS):
             parent_intent = [0, 0]
             parent_intent[loop] = 1
@@ -434,29 +436,25 @@ for episode in range(NUM_EPISODES):
             pred_noun_verb.append(name)
             ans_noun_verb.append(symbols[objectIndex])
 
-            reward = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
+            reward, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
 
             not_sure_count = 0 # 「分からない」フラグを元に戻す
 
-            # step終了の判断
-        if reward == 2 or step+1 == MAX_NUMBER_OF_STEPS:
-            terminal = 1
+            memory_in[loop][step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward, terminal[loop], parent_order.reshape(-1)]
 
-        memory_in[step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward, terminal, parent_order.reshape(-1)]
-        
-        memory_step.add(memory_in)
+            memory_step.add(memory_in[loop])
 
-        if (memory_episode.len() > BATCH_SIZE) and terminal == 1:
-            if PER_MODE == True:
-                memory_episode.add(memory_in)
-                TDerror = memory_TDerror.get_TDerror(memory_episode, GAMMA, mainQN, targetQN)
-                memory_TDerror.add(TDerror)
-                history = mainQN.prioritized_experience_replay(memory_episode, BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
+            if (memory_episode.len() > BATCH_SIZE) and terminal == 1:
+                if PER_MODE == True:
+                    memory_episode.add(memory_in[loop])
+                    TDerror = memory_TDerror.get_TDerror(memory_episode, GAMMA, mainQN, targetQN)
+                    memory_TDerror.add(TDerror)
+                    history = mainQN.prioritized_experience_replay(memory_episode, BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
+                else:
+                    history = mainQN.replay(memory_episode, BATCH_SIZE, GAMMA, targetQN)
             else:
-                history = mainQN.replay(memory_episode, BATCH_SIZE, GAMMA, targetQN)
-        else:
-            history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
+                history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
                  
         if terminal == 1:
             # 正解の場合フラグを立てる
