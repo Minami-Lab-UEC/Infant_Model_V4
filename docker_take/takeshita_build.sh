@@ -1,0 +1,1 @@
+docker build -t takeshita_include_densetrack --force_rm=true .

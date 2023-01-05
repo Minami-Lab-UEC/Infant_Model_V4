@@ -4,3 +4,4 @@ pandas
 scipy
 sklearn
 tensorflow_addons
+scikit_video
