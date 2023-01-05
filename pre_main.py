@@ -42,11 +42,11 @@ import codecs
 # 時間計測スタート #
 starttime = time.time()
 
-dir_path = './result_9/'
-os.makedirs(dir_path, exist_ok=True)
-os.makedirs(dir_path+'check_points/', exist_ok=True)
-ckpt_path = './result_1/check_points/my_checkpoint'
-image_path = './jaffedbase/jaffedbase/'
+DIR_PATH = './result_9/'
+os.makedirs(DIR_PATH, exist_ok=True)
+os.makedirs(DIR_PATH+'check_points/', exist_ok=True)
+CHPT_PATH = './result_1/check_points/my_checkpoint'
+IMAGE_PATH = './jaffedbase/jaffedbase/'
 
 
 # In[3]:
@@ -62,7 +62,7 @@ def plot_history(epochs, acc):
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.ylim([-0.02,1.02])
-    # plt.savefig(dir_path + 'model_accuracy.png')
+    # plt.savefig(DIR_PATH + 'model_accuracy.png')
     # plt.savefig('figure_acc/figure_' + datetime.now().strftime('%Y%m%d') + '.png')
     # plt.show()
 
@@ -149,7 +149,7 @@ parent_length = 32
 state_length = actions_length + features_length + objects_length + guess_length
 output_length = actions_length + objects_length
 
-parent_FE = get_fe(image_path) #表情一覧を取得
+parent_FE = get_fe(IMAGE_PATH) #表情一覧を取得
 
 # 親の意図を確率変数で変化させる
 pos = ['noun', 'verb']
@@ -198,9 +198,10 @@ for episode in range(NUM_EPISODES):
     # 親の意図を確率変数で変化させる
     # 0 : noun
     # 1 : verb
-    parent_select = np.random.choice([0, 1], p=[noun_p, verb_p])
-    if episode in range(6000, 6100) or episode in range(8000, 8100):
-        parent_select = 0 # 途中で名詞学習のタイミングを入れたらどうなるのか実験
+    # parent_select = np.random.choice([0, 1], p=[noun_p, verb_p])
+    # if episode in range(6000, 6100) or episode in range(8000, 8100):
+    #     parent_select = 0 # 途中で名詞学習のタイミングを入れたらどうなるのか実験
+    parent_select = 0
 
     if parent_select == 0:
         objectIndex = random.randint(0, len(symbols_noun)-2)
@@ -361,7 +362,7 @@ for episode in range(NUM_EPISODES):
     
     if episode % TEST_EPOCHS_INTERVAL == 0:
         reward_sum, reward_sum_n, reward_sum_v = mainQN.test(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
-                                                     mask1, mask2, TEST_EPOCHS, MAX_NUMBER_OF_STEPS, episode, dir_path,
+                                                     mask1, mask2, TEST_EPOCHS, MAX_NUMBER_OF_STEPS, episode, DIR_PATH,
                                                             PER_ERROR, parent_FE)
         if len(epochs) == 0:
             epoch = 0
@@ -376,11 +377,11 @@ for episode in range(NUM_EPISODES):
         plot_history(epochs, acc)
         
         if episode == 10000:
-            mainQN.model.save_weights(dir_path+'check_points/my_checkpoint_10000')
+            mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_10000')
         elif episode == 20000:
-            mainQN.model.save_weights(dir_path+'check_points/my_checkpoint_20000')
+            mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_20000')
         elif episode == 30000:
-            mainQN.model.save_weights(dir_path+'check_points/my_checkpoint_30000')
+            mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_30000')
         
     """
     if len(epochs) == 0:
@@ -393,24 +394,25 @@ for episode in range(NUM_EPISODES):
     plot_history(epochs, acc)
     """
     
-with open(dir_path+'+LSTM_acc.pickle', mode='wb') as f:
+with open(DIR_PATH+'+LSTM_acc.pickle', mode='wb') as f:
     pickle.dump(acc, f)
 
 # 名詞と動詞の正答率の推移をプロット
 # noun_transition : list, episodeごとに正答率を計算しappend
 # verb_transition : list, episodeごとに正答率を計算しappend
-df.to_pickle(dir_path+'acc_transition.pkl')
+df.to_pickle(DIR_PATH+'acc_transition.pkl')
 
+mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_{NUM_EPISODES}')
     
-plt.savefig(dir_path+'figure' + datetime.now().strftime('%Y%m%d' + '.png'))
+plt.savefig(DIR_PATH+'figure' + datetime.now().strftime('%Y%m%d' + '.png'))
 
 if MODEL_LOAD == False:
-    os.makedirs(dir_path+'check_points/', exist_ok=True)
-    mainQN.model.save_weights(dir_path+'check_points/my_checkpoint')
+    os.makedirs(DIR_PATH+'check_points/', exist_ok=True)
+    mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint')
 
 # 時間計測の結果を出力
-print('----------------------------', file=codecs.open(dir_path+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
-print('time : ', time.time() - starttime, file=codecs.open(dir_path+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
+print('----------------------------', file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
+print('time : ', time.time() - starttime, file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
 
 # In[ ]:
 
