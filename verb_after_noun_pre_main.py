@@ -92,7 +92,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 1  # 総試行回数(episode数)
+NUM_EPISODES = 0  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
@@ -297,6 +297,9 @@ for episode in range(NUM_EPISODES):
 
     record = pd.Series([parent_select, correct], index=df.columns)
     df = pd.concat([df, pd.DataFrame([record])], ignore_index=True)
+
+    ass = action_step_state
+    o = out
     
     if episode % TEST_EPOCHS_INTERVAL == 0:
         reward_sum, reward_sum_n, reward_sum_v = mainQN.test(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
@@ -369,13 +372,12 @@ for episode in range(NUM_EPISODES):
     obj = [0] * objects_length
     fea_vec = [0] * actions_length # 特徴の種類
     fea_val = [0] * features_length # 特徴量の値
-    # requests = []
+    requests = []
     mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
     mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
     guess = [0] # not_sureを選んだ回数
     not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
     #parent_order = np.reshape(parent_order, [1, parent_length])
-    parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
             
     memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
         [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
@@ -383,15 +385,16 @@ for episode in range(NUM_EPISODES):
     # 名詞と動詞を入れるメモリを用意するため、リストを倍にする
     memory_in = [[memory_none] * 2 * MAX_NUMBER_OF_STEPS] * MAX_NUMBER_OF_LOOPS
             
-    action_step_state = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, state_length))
-    out = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, output_length))
+    action_step_state = np.zeros((MAX_NUMBER_OF_LOOPS, 2 * MAX_NUMBER_OF_STEPS, state_length))
+    out = np.zeros((MAX_NUMBER_OF_LOOPS, 2 * MAX_NUMBER_OF_STEPS, output_length))
     
     for step in range(MAX_NUMBER_OF_STEPS):
         for loop in range(MAX_NUMBER_OF_LOOPS):
+            print(f'episode : {episode}, step : {step}, loop : {loop}')
             parent_intent = [0, 0]
             parent_intent[loop] = 1
             parent_select = loop
-            if loop == 0:
+            if parent_select == 0:
                 objectIndex = random.randint(0, len(symbols_noun)-2)
             else:
                 objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
@@ -407,31 +410,33 @@ for episode in range(NUM_EPISODES):
             else:
                 idx = random.randint(0, 5)
                 parent_order = parent_FE[idx]
+
+            parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
             
             pre_fea_vec = copy.deepcopy(fea_vec)
             pre_obj_vec = copy.deepcopy(obj)
             state1 = np.concatenate([fea_vec, fea_val, obj, guess])
             state1 = np.reshape(state1, [1, state_length])
             mask1 = np.reshape(mask1, [1, output_length])
-            action_step_state[0][step] = state1
+            action_step_state[loop][step] = state1 # 動詞学習の際に名詞学習の結果を上書きしている？要検討
             out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
-            out[0][step] = np.reshape(out_1, [1, output_length])
+            out[loop][step] = np.reshape(out_1, [1, output_length])
 
             obj_val_idx, retTargetQs = actor.get_value(action_step_state, out, mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
             retTargetQs = retTargetQs[retTargetQs != 0]
-            obj_val_idx_l = np.vstack([obj_val_idx_l, retTargetQs])
 
             fea_vec[obj_val_idx] = 1
-            # request = actions[obj_val_idx]
-            # requests.append(request)
+            request = actions[obj_val_idx]
+            requests.append(request)
             fea_val = Data.Overfetch(objectIndex, list(set(requests)), rand, parent_select)       
             state2 = np.concatenate([fea_vec, fea_val, obj, guess])
             state2 = np.reshape(state2, [1,state_length])
             mask2 = np.reshape(mask2, [1, output_length])
-            action_step_state[0][step+1] = state2
+            action_step_state[loop][step+1] = state2
             out_2 = np.concatenate([fea_vec, pre_obj_vec])
-            out[0][step+1] = np.reshape(out_2, [1, output_length])
-            obj_name_idx = actor.get_name(action_step_state, out, mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
+            out[loop][step+1] = np.reshape(out_2, [1, output_length])
+            print(f'action_step_state : {len(action_step_state[loop][step])}, out : {len(out[loop][step])}, mask2 : {len(mask2)}, parent_order : {len(parent_order)}')
+            obj_name_idx = actor.get_name(action_step_state[loop], out[loop], mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
 
             name = symbols[obj_name_idx - actions_length]
             obj[obj_name_idx - actions_length] = 1
@@ -445,6 +450,13 @@ for episode in range(NUM_EPISODES):
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
 
             not_sure_count = 0 # 「分からない」フラグを元に戻す
+
+            memory_in[step] = [state1.reshape(-1), state2.reshape(-1), out_1, out_2, mask1.reshape(-1), mask2.reshape(-1), obj_val_idx, reward, terminal[loop], parent_order.reshape(-1)] # out_1がなぜか入っている
+            # for j, (state_b, next_state_b, out_b, next_out_b, mask_b, next_mask_b, action_b, reward_b, terminal_b, parent_order_b) in enumerate(eps):
+            # ValueError: too many values to unpack (expected 10)
+        
+            state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+            next_out = fea_vec+obj
 
             memory_in[loop][step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward, terminal[loop], parent_order.reshape(-1)]
 
@@ -463,6 +475,7 @@ for episode in range(NUM_EPISODES):
                  
             if terminal[loop] == 1:
                 if episode % SET_TARGETQN_INTERVAL == 0:
+                    print('SET_TARGETQN')
                     targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
                     memory_TDerror.update_TDerror(memory_episode, GAMMA, mainQN, targetQN)
         
@@ -474,6 +487,7 @@ for episode in range(NUM_EPISODES):
             break
         
     if episode % TEST_EPOCHS_INTERVAL == 0:
+        print('test!')
         reward_sum, reward_sum_n, reward_sum_v = mainQN.test(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
                                                         mask1, mask2, TEST_EPOCHS, MAX_NUMBER_OF_STEPS, episode, DIR_PATH,
                                                                 PER_ERROR, parent_FE)

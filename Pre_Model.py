@@ -30,7 +30,7 @@ from tensorflow_addons.activations import mish
 from tensorflow_addons.optimizers import RectifiedAdam
 
 
-def reward_func_onlynoun(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
     terminal = 0 # 終了しているか否か
 
@@ -49,7 +49,7 @@ def reward_func_onlynoun(objectIndex, predict_idx, guess, step, max_step, test_m
     
     return reward, terminal
 
-def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
+def reward_func_verbnoun(objectIndex, predict_idx, guess, step, max_step, test_mode, requests, request,predict_val_idx, verb_idx, symbols, symbols_verb, parent_select, name):
     reward = 0 # 正解か不正解か
     terminal = [0, 0]
     # test_modeはpre_main.pyでFalseにされている
@@ -62,7 +62,7 @@ def reward_func(objectIndex, predict_idx, guess, step, max_step, test_mode, requ
         if guess == 1:
             reward = -0.2
     if step+1 == max_step:
-        terminal[parent_select] = 1 
+        terminal = [1] * 2
     
     return reward, terminal
 
@@ -77,11 +77,12 @@ def loss_func(y_true, y_pred):
 
 # [2]Q関数をディープラーニングのネットワークをクラスとして定義
 class QNetwork:
-    def __init__(self, learning_rate=0.01, state_size=83300, step_size=5, feature_size=0, 
+    def __init__(self, learning_rate=0.01, state_size=83300, step_size=5, loop_size=2, feature_size=0, 
                  action_size=4, object_size=6, output_size=10, parent_size=4, embedding_size=200, hidden_size=100, hidden_size_2=16,
                   p_hidden_size=32):
         self.state_size = state_size
         self.step_size = step_size
+        self.loop_size = loop_size
         self.action_size = action_size
         self.object_size = object_size
         self.output_size = output_size
