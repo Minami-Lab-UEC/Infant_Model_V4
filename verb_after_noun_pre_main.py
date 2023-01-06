@@ -92,7 +92,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 10000  # 総試行回数(episode数)
+NUM_EPISODES = 1  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
@@ -258,7 +258,7 @@ for episode in range(NUM_EPISODES):
             not_sure_count = 1
         
         # 報酬を設定し、与える
-        reward, terminal = reward_func_onlynoun(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
+        reward, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
 
         not_sure_count = 0 # 「分からない」フラグを元に戻す
@@ -341,9 +341,13 @@ plt.savefig(DIR_PATH+'figure' + datetime.now().strftime('%Y%m%d' + '.png'))
 print('----------------------------', file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
 print('time : ', time.time() - starttime, file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
 
+print(f'noun learned!! time : {time.time() - starttime}')
+
 ############ 名詞を学習した ############
 
 starttime = time.time()
+
+NUM_EPISODES = 1000  # 総試行回数(episode数)
 
 # 名詞→動詞の順に学習するループ
 for episode in range(NUM_EPISODES):
@@ -376,7 +380,7 @@ for episode in range(NUM_EPISODES):
     memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
         [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
     
-    # 名詞と動詞を入れるためのメモリを用意するため、リストを倍にする
+    # 名詞と動詞を入れるメモリを用意するため、リストを倍にする
     memory_in = [[memory_none] * 2 * MAX_NUMBER_OF_STEPS] * MAX_NUMBER_OF_LOOPS
             
     action_step_state = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, state_length))
@@ -386,6 +390,7 @@ for episode in range(NUM_EPISODES):
         for loop in range(MAX_NUMBER_OF_LOOPS):
             parent_intent = [0, 0]
             parent_intent[loop] = 1
+            parent_select = loop
             if loop == 0:
                 objectIndex = random.randint(0, len(symbols_noun)-2)
             else:
@@ -436,7 +441,7 @@ for episode in range(NUM_EPISODES):
             pred_noun_verb.append(name)
             ans_noun_verb.append(symbols[objectIndex])
 
-            reward, terminal = reward_func(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
+            reward, terminal = reward_func_verbnoun(objectIndex, (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
                                                                     False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
 
             not_sure_count = 0 # 「分からない」フラグを元に戻す
@@ -456,38 +461,40 @@ for episode in range(NUM_EPISODES):
             else:
                 history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
                  
-        if terminal == 1:
-            # 正解の場合フラグを立てる
+            if terminal[loop] == 1:
+                if episode % SET_TARGETQN_INTERVAL == 0:
+                    targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
+                    memory_TDerror.update_TDerror(memory_episode, GAMMA, mainQN, targetQN)
+        
+        if terminal == [1, 1]: # 名詞と動詞どちらも正解かstepの上限まで達したら
             print(f'predict : {pred_noun_verb}, ans : {ans_noun_verb}')
+            # 正解の場合フラグを立てる
             if pred_noun_verb == ans_noun_verb:
                 correct = 1
-            if episode % SET_TARGETQN_INTERVAL == 0:
-                targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
-                memory_TDerror.update_TDerror(memory_episode, GAMMA, mainQN, targetQN)
             break
         
-        if episode % TEST_EPOCHS_INTERVAL == 0:
-            reward_sum, reward_sum_n, reward_sum_v = mainQN.test(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
+    if episode % TEST_EPOCHS_INTERVAL == 0:
+        reward_sum, reward_sum_n, reward_sum_v = mainQN.test(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
                                                         mask1, mask2, TEST_EPOCHS, MAX_NUMBER_OF_STEPS, episode, DIR_PATH,
                                                                 PER_ERROR, parent_FE)
-            if len(epochs) == 0:
-                epoch = 0
-            else:
-                epoch = max(epochs) + TEST_EPOCHS
-            acc.append(reward_sum/(TEST_EPOCHS))
-            epochs.append(epoch)
+        if len(epochs) == 0:
+            epoch = 0
+        else:
+            epoch = max(epochs) + TEST_EPOCHS
+        acc.append(reward_sum/(TEST_EPOCHS))
+        epochs.append(epoch)
             
-            if acc[-1] >= PRIORITIZED_MODE_BORDER:
-                PER_MODE = True
+        if acc[-1] >= PRIORITIZED_MODE_BORDER:
+            PER_MODE = True
             
-            plot_history(epochs, acc)
+        plot_history(epochs, acc)
             
-            if episode == 10000:
-                mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_10000')
-            elif episode == 20000:
-                mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_20000')
-            elif episode == 30000:
-                mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_30000')
+        if episode == 10000:
+            mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_10000')
+        elif episode == 20000:
+            mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_20000')
+        elif episode == 30000:
+            mainQN.model.save_weights(DIR_PATH+'check_points/my_checkpoint_30000')
 
 mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_verbafternoun_{NUM_EPISODES}')
     
@@ -496,8 +503,3 @@ plt.savefig(DIR_PATH+'figure' + datetime.now().strftime('%Y%m%d' + '.png'))
 # 時間計測の結果を出力
 print('----------------------------', file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
 print('time : ', time.time() - starttime, file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
-
-
-
-
-
