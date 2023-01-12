@@ -19,7 +19,7 @@ from tensorflow.keras.utils import img_to_array, load_img
 from collections import deque
 # from gym import wrappers  # gymの画像保存
 from keras import backend as K
-from IPython.display import clear_output
+# from IPython.display import clear_output
 import tensorflow as tf
 import matplotlib
 matplotlib.use('Agg')
@@ -51,16 +51,20 @@ IMAGE_PATH = './jaffedbase/jaffedbase/'
 # In[3]:
 
 
-def plot_history(epochs, acc):
+def plot_history(epochs, acc, i):
     # print(history.history.keys())
     
-    clear_output(wait = True)
+    # clear_output(wait = True)
     # 精度の履歴をプロット
+    plt.clf()
+    plt.close() # 前回のループのpltをcloseすることでメモリ解放？https://qiita.com/Masahiro_T/items/bdd0482a8efd84cdd270
+
     plt.plot(epochs, acc)
     plt.title('model accuracy')
     plt.xlabel('epoch')
     plt.ylabel('accuracy')
     plt.ylim([-0.02,1.02])
+    plt.savefig(DIR_PATH+'figure_verbafternoun_' + datetime.now().strftime('%Y%m%d') + f'_{i}' + '.png')
     # plt.savefig(DIR_PATH + 'model_accuracy.png')
     # plt.savefig('figure_acc/figure_' + datetime.now().strftime('%Y%m%d') + '.png')
     # plt.show()
@@ -91,15 +95,15 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 10000  # 総試行回数(episode数)
+NUM_EPISODES = 20000  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
 GAMMA = 0.99    # 割引係数
 ISLEARNED = False  # 学習が終わったフラグ
 ISRENDER = False  # 描画フラグ
-acc = []
-epochs = []
+# acc = []
+# epochs = []
 # ---
 #HIDDEN_SIZE = 1536               # LSTMの隠れ層のニューロンの数
 #HIDDEN_SIZE = 64
@@ -177,13 +181,17 @@ memory_TDerror = Memory_TDerror(max_size=MEMORY_SIZE, state_size=state_length, o
 actor = Actor(features_length=features_length, objects_length=objects_length, actions_length=actions_length, output_size=output_length, MODEL_LOAD=MODEL_LOAD)
 
 # 名詞だけを学習するループ
-ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_{NUM_EPISODES}'
-# ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_10000'
-for _ in range(2):
+# ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_{NUM_EPISODES}'
+ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_10000'
+for i in range(2):
+    acc = []
+    epochs = []
+    name_select_list = np.empty((NUM_EPISODES, MAX_NUMBER_OF_LOOPS, MAX_NUMBER_OF_STEPS), dtype=object) # 名称選択の保存リスト
+    feature_select_list = np.empty_like(name_select_list) # 特徴選択の保存リスト
     if os.path.isfile(ckpt_path + '.index'):
-        if _ == 0:
+        if i == 0:
             print('not load weights for model, start learning!!')
-        if _ == 1:
+        if i == 1:
             mainQN.model.load_weights(ckpt_path)
             print('model load weights!!')   
     else:
@@ -328,7 +336,7 @@ for _ in range(2):
                 if acc[-1] >= PRIORITIZED_MODE_BORDER:
                     PER_MODE = True
                 
-                plot_history(epochs, acc)
+                # plot_history(epochs, acc)
                 
                 if episode == 1000 or episode == 5000 or episode == 8000:
                     mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_{episode}')
@@ -438,6 +446,7 @@ for _ in range(2):
                 out[loop][0][step] = np.reshape(out_1, [1, output_length])
 
                 obj_val_idx, retTargetQs = actor.get_value(action_step_state[loop], out[loop], mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
+                feature_select_list[episode, loop, step] = actions[obj_val_idx]
                 retTargetQs = retTargetQs[retTargetQs != 0]
 
                 fea_vec[obj_val_idx] = 1
@@ -454,6 +463,7 @@ for _ in range(2):
                 obj_name_idx = actor.get_name(action_step_state[loop], out[loop], mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
 
                 name = symbols[obj_name_idx - actions_length]
+                name_select_list[episode, loop, step] = name
                 obj[obj_name_idx - actions_length] = 1
                 if name == 'not_sure':
                     not_sure_count = 1
@@ -514,18 +524,22 @@ for _ in range(2):
             acc.append(reward_sum/(TEST_EPOCHS))
             print(f'test accuracy : {reward_sum/(TEST_EPOCHS)}')
             epochs.append(epoch)
+            
+            plot_history(epochs, acc, i)
                 
             if acc[-1] >= PRIORITIZED_MODE_BORDER:
                 PER_MODE = True
                 
-            plot_history(epochs, acc)
-                
-        if episode == 1000 or episode == 5000 or episode == 8000:
-            mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_{episode}_{_}')
+        # if episode == 1000 or episode == 5000 or episode == 8000:
+        #     mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_{episode}_{i}')
 
-    mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_verbafternoun_{NUM_EPISODES}_{_}')
+        # print(name_select_list)
+        # print(feature_select_list)
+    np.save(DIR_PATH + 'numpy/' + f'verbafternoun_name_{NUM_EPISODES}_{i}.npy', name_select_list)
+    np.save(DIR_PATH + 'numpy/' + f'verbafternoun_feature_{NUM_EPISODES}_{i}.npy', feature_select_list)
+
+    mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_verbafternoun_{NUM_EPISODES}_{i}')
         
-    plt.savefig(DIR_PATH+'figure_verbafternoun_' + datetime.now().strftime('%Y%m%d' + '.png'))
 
     # 時間計測の結果を出力
     print('----------------------------', file=codecs.open(DIR_PATH+'elapsed_time'+datetime.now().strftime('%Y%m%d')+'.txt', 'a', 'utf-8'))
