@@ -95,7 +95,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 20000  # 総試行回数(episode数)
+NUM_EPISODES = 10000  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
@@ -188,6 +188,10 @@ for i in range(2):
     epochs = []
     name_select_list = np.empty((NUM_EPISODES, MAX_NUMBER_OF_LOOPS, MAX_NUMBER_OF_STEPS), dtype=object) # 名称選択の保存リスト
     feature_select_list = np.empty_like(name_select_list) # 特徴選択の保存リスト
+
+    memory_episode_list = [memory_episode] * MAX_NUMBER_OF_LOOPS
+    # memory_TDerror_list = [memory_TDerror] * MAX_NUMBER_OF_LOOPS
+
     if os.path.isfile(ckpt_path + '.index'):
         if i == 0:
             print('not load weights for model, start learning!!')
@@ -295,6 +299,7 @@ for i in range(2):
                 
                 if (memory_episode.len() > BATCH_SIZE) and terminal == 1:
                     if PER_MODE == True:
+                        print('experience_replay')
                         memory_episode.add(memory_in)
                         TDerror = memory_TDerror.get_TDerror(memory_episode, GAMMA, mainQN, targetQN)
                         memory_TDerror.add(TDerror)
@@ -487,22 +492,29 @@ for i in range(2):
 
                 memory_step.add(memory_in[loop])
 
-                if (memory_episode.len() > BATCH_SIZE) and terminal == 1:
+                # print(f'memory_episode.len() : {memory_episode_list[loop].len()}')
+
+                if (memory_episode_list[loop].len() > BATCH_SIZE) and terminal[loop] == 1:
                     if PER_MODE == True:
-                        memory_episode.add(memory_in[loop])
-                        TDerror = memory_TDerror.get_TDerror(memory_episode, GAMMA, mainQN, targetQN)
+                        print('experience_replay')
+                        memory_episode_list[loop].add(memory_in[loop])
+                        TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
                         memory_TDerror.add(TDerror)
-                        history = mainQN.prioritized_experience_replay(memory_episode, BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
+                        history = mainQN.prioritized_experience_replay(memory_episode_list[loop], BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
                     else:
-                        history = mainQN.replay(memory_episode, BATCH_SIZE, GAMMA, targetQN)
+                        history = mainQN.replay(memory_episode_list[loop], BATCH_SIZE, GAMMA, targetQN)
                 else:
                     history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
                     
                 if terminal[loop] == 1:
+                    memory_episode_list[loop].add(memory_in[loop])
+                    TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
+                    memory_TDerror.add(TDerror)
+
                     if episode % SET_TARGETQN_INTERVAL == 0:
                         # print('SET_TARGETQN')
                         targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
-                        memory_TDerror.update_TDerror(memory_episode, GAMMA, mainQN, targetQN)
+                        memory_TDerror.update_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
             
             print(f'terminal : {terminal}, reward : {reward}')
             if terminal == [1, 1]: # 名詞と動詞どちらも正解かstepの上限まで達したら

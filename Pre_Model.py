@@ -481,7 +481,7 @@ class Memory_TDerror(Memory):
             
             next_state = np.reshape(next_state, [1, self.state_size])
             next_mask = np.reshape(next_mask, [1, self.output_size])
-            parent_order = np.reshape(parent_order, [1, self.parent_size])
+            parent_order = np.reshape(parent_order, [1, self.parent_size, self.parent_size, 1])
             next_state_t[j+1:j+2] = next_state
             next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
             retmainQs = mainQN.model([next_state_t,  next_out_vec_t, next_mask, parent_order])
@@ -491,9 +491,9 @@ class Memory_TDerror(Memory):
             state = np.reshape(state, [1, self.state_size])
             mask = np.reshape(mask, [1, self.output_size])
             state_t[j:j+1] = state
-            out_t[j:j+1] = np.reshape(out, [1, self.output_size])
+            out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size])
             
-            TDerror.append(target - targetQN.model([state_t, out_t, mask, parent_order])[0][action])
+            TDerror.append(target - targetQN.model([state_t, out_vec_t, mask, parent_order])[0][action])
         
         return sum(TDerror) / len(TDerror)
         
@@ -509,7 +509,7 @@ class Memory_TDerror(Memory):
                 next_state_t[j:j+1] = np.reshape(state, [1, self.state_size])
                 next_state = np.reshape(next_state, [1, self.state_size])
                 next_mask = np.reshape(next_mask, [1, self.output_size])
-                parent_order = np.reshape(parent_order, [1, self.parent_size])
+                parent_order = np.reshape(parent_order, [1, self.parent_size, self.parent_size, 1])
                 next_state_t[j+1:j+2] = next_state
                 next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
                 retmainQs = mainQN.model([next_state_t, next_out_vec_t, next_mask, parent_order])
@@ -519,8 +519,8 @@ class Memory_TDerror(Memory):
                 state = np.reshape(state, [1, self.state_size])
                 mask = np.reshape(mask, [1, self.output_size])
                 state_t[j:j+1] = state
-                out_t[j:j+1] = np.reshape(out, [1, self.output_size])
-                TDerror.append(target - targetQN.model([state_t, out_t, mask, parent_order])[0][action])
+                out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size])
+                TDerror.append(target - targetQN.model([state_t, out_vec_t, mask, parent_order])[0][action])
                 
             self.buffer[i] = sum(TDerror) / len(TDerror)
             
