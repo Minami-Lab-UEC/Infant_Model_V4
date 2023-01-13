@@ -201,10 +201,13 @@ class QNetwork:
     # 優先度付き経験再生
     def prioritized_experience_replay(self, memory, batch_size, gamma, targetQN, memory_TDerror):
         
+        # TDerror_calc = time.time()
         sum_absolute_TDerror = memory_TDerror.get_sum_absolute_TDerror()
         generatedrand_list = np.random.uniform(0, sum_absolute_TDerror, batch_size)
         generatedrand_list = np.sort(generatedrand_list)
+        # print(f'one time TDerror calc : {time.time() - TDerror_calc}')
         
+        # batch_sel = time.time()
         batch_memory = []
         idx = 0
         tmp_sum_absolute_TDerror = 0
@@ -214,7 +217,9 @@ class QNetwork:
                 idx += 1
                 
             batch_memory.append(memory.buffer[idx])
-            
+        # print(f'one time batch select : {time.time() - batch_sel}')
+
+        
         inputs = np.zeros((batch_size, 2*self.step_size, self.state_size))
         targets = np.zeros((batch_size, self.output_size))
         inputs = np.zeros((batch_size, 2*self.step_size, self.state_size))
@@ -233,7 +238,7 @@ class QNetwork:
         
         for i, eps in enumerate(batch_memory):
             for j, (state_b, next_state_b, out_b, next_out_b, mask_b, next_mask_b, action_b, reward_b, terminal_b, parent_order_b) in enumerate(eps):
-                
+                # batch_calc = time.time()
                 inputs[i][j:j+1] = state_b
                 out_vec[i][j:j+1] = out_b
                 next_state_t[j:j+1] = np.reshape(state_b, [1, self.state_size])
@@ -260,10 +265,12 @@ class QNetwork:
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
                 targets_restore[i][j] = self.model([state_t, out_vec_t, mask_b, parent_order_b])
                 targets_restore[i][j][action_b] = target
-                
+                # print(f'one time batch calc : {time.time() - batch_calc}')
             targets[i] = np.mean(targets_restore[i], axis=0)
+                
+        # fit_time = time.time()
         history = self.model.fit([inputs, out_vec, masks, parent_orders], targets, epochs=1)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
-        
+        # print(f'one time fit : {time.time() - fit_time}')
         return history
         
     

@@ -95,7 +95,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 10000  # 総試行回数(episode数)
+NUM_EPISODES = 2000  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
@@ -117,8 +117,8 @@ EMBEDDING_SIZE = 2048
 """HIDDEN_SIZE_2 = 32"""
 HIDDEN_SIZE_2 = 512
 LEARNING_RATE = 0.00001         # Q-networkの学習係数
-MEMORY_SIZE = 96            # バッファーメモリの大きさ
-BATCH_SIZE = 64                # Q-networkを更新するバッチの大記載
+MEMORY_SIZE = 48            # バッファーメモリの大きさ 96 → 48
+BATCH_SIZE = 16                # Q-networkを更新するバッチの大記載
 TEST_EPOCHS_INTERVAL = 50 # 何エポック毎にテストするか
 TEST_EPOCHS = 50 # テスト回数
 PRIORITIZED_MODE_BORDER = 0.3 # prioritized experience replayに入る正答率
@@ -421,6 +421,7 @@ for i in range(2):
         for step in range(MAX_NUMBER_OF_STEPS):
             reward = [0, 0]
             terminal = [0, 0]
+            # oneloop_time = time.time()
             for loop in range(MAX_NUMBER_OF_LOOPS):
                 # print(f'episode : {episode}, step : {step}, loop : {loop}')
                 parent_intent = [0, 0]
@@ -490,40 +491,46 @@ for i in range(2):
 
                 memory_in[loop][step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward[loop], terminal[loop], parent_order.reshape(-1)]
 
+                # TDerror_calc = time.time()
                 memory_step.add(memory_in[loop])
+                memory_episode_list[loop].add(memory_in[loop])
+                TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
+                memory_TDerror.add(TDerror)
+                # print(f'one time TDerror calc : {time.time() - TDerror_calc}')
 
                 # print(f'memory_episode.len() : {memory_episode_list[loop].len()}')
 
                 if (memory_episode_list[loop].len() > BATCH_SIZE) and terminal[loop] == 1:
                     if PER_MODE == True:
                         print('experience_replay')
-                        memory_episode_list[loop].add(memory_in[loop])
-                        TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
-                        memory_TDerror.add(TDerror)
+                        # exp_replay_time = time.time()
                         history = mainQN.prioritized_experience_replay(memory_episode_list[loop], BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
+                        # print(f'exp replay time : {time.time() - exp_replay_time}')
                     else:
                         history = mainQN.replay(memory_episode_list[loop], BATCH_SIZE, GAMMA, targetQN)
                 else:
+                    # replay_time = time.time()
                     history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
+                    # print(f'normal replay time : {time.time() - replay_time}')
                     
                 if terminal[loop] == 1:
-                    memory_episode_list[loop].add(memory_in[loop])
-                    TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
-                    memory_TDerror.add(TDerror)
+                    # memory_episode_list[loop].add(memory_in[loop])
+                    # TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
+                    # memory_TDerror.add(TDerror)
 
                     if episode % SET_TARGETQN_INTERVAL == 0:
                         # print('SET_TARGETQN')
                         targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
                         memory_TDerror.update_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
             
-            print(f'terminal : {terminal}, reward : {reward}')
+            # print(f'terminal : {terminal}, reward : {reward}')
             if terminal == [1, 1]: # 名詞と動詞どちらも正解かstepの上限まで達したら
                 print(f'predict : {pred_noun_verb}, ans : {ans_noun_verb}')
                 # 正解の場合フラグを立てる
                 if pred_noun_verb == ans_noun_verb:
                     correct = 1
                 break
-            
+            # print(f'one time loop : {time.time() - oneloop_time}')
         if episode % TEST_EPOCHS_INTERVAL == 0:
             print('test!')
             reward_sum, reward_sum_n, reward_sum_v = mainQN.test_verbnoun(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
