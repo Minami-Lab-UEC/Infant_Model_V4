@@ -285,7 +285,8 @@ class QNetwork:
             fea_vec = [0] * self.action_size # 特徴の種類
             fea_val = [0] * self.feature_length # 特徴量の値
             requests = []
-            guess = [0] # not_sureを選んだ回数
+            # guess = [0] # not_sureを選んだ回数
+            cur_loop = [0] # ループ回数を保存、名詞のみを学習するときは使わない
             not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
             
             parent_intent = [1, 0]
@@ -317,7 +318,7 @@ class QNetwork:
             for step in range(max_number_of_steps):
                 pre_fea_vec = copy.deepcopy(fea_vec)
                 pre_obj_vec = copy.deepcopy(obj)
-                state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state1 = np.reshape(state1, [1, self.state_size])
                 mask1 = np.reshape(mask1, [1, self.output_size])
                 action_step_state[0][step] = state1
@@ -330,7 +331,7 @@ class QNetwork:
                 request = actions[obj_val_idx]
                 requests.append(request)
                 fea_val = Data.Overfetch(objectIndex, list(set(requests)), rand, parent_select)       
-                state2 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state2 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state2 = np.reshape(state2, [1, self.state_size])
                 mask2 = np.reshape(mask2, [1, self.output_size])
                 action_step_state[0][step+1] = state2
@@ -348,7 +349,7 @@ class QNetwork:
                                                                    True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name)
                 not_sure_count = 0
                 
-                state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 
                 if terminal:
                     if reward == 1:
@@ -372,7 +373,8 @@ class QNetwork:
             fea_vec = [0] * self.action_size # 特徴の種類
             fea_val = [0] * self.feature_length # 特徴量の値
             requests = []
-            guess = [0] # not_sureを選んだ回数
+            # guess = [0] # not_sureを選んだ回数
+            cur_loop = [0] # ループ回数を保存、stateに組み込む
             not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
 
             action_step_state = np.zeros((max_number_of_loops, 1, 2*self.step_size, self.state_size))
@@ -406,7 +408,7 @@ class QNetwork:
 
                     pre_fea_vec = copy.deepcopy(fea_vec)
                     pre_obj_vec = copy.deepcopy(obj)
-                    state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                    state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                     state1 = np.reshape(state1, [1, self.state_size])
                     mask1 = np.reshape(mask1, [1, self.output_size])
                     action_step_state[loop][0][step] = state1
@@ -419,7 +421,7 @@ class QNetwork:
                     request = actions[obj_val_idx]
                     requests.append(request)
                     fea_val = Data.Overfetch(objectIndex, list(set(requests)), rand, parent_select)       
-                    state2 = np.concatenate([fea_vec, fea_val, obj, guess])
+                    state2 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                     state2 = np.reshape(state2, [1, self.state_size])
                     mask2 = np.reshape(mask2, [1, self.output_size])
                     action_step_state[loop][0][step+1] = state2
@@ -437,7 +439,7 @@ class QNetwork:
                                                                     True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name, reward, terminal)
                     not_sure_count = 0
                     
-                    state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                    state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
 
                 if terminal == [1, 1]:
                     if reward == [1, 1]:

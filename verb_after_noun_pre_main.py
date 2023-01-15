@@ -117,8 +117,8 @@ EMBEDDING_SIZE = 2048
 """HIDDEN_SIZE_2 = 32"""
 HIDDEN_SIZE_2 = 512
 LEARNING_RATE = 0.00001         # Q-networkの学習係数
-MEMORY_SIZE = 48            # バッファーメモリの大きさ 96 → 48
-BATCH_SIZE = 16                # Q-networkを更新するバッチの大記載
+MEMORY_SIZE = 1536            # バッファーメモリの大きさ 96 → 48
+BATCH_SIZE = 1024                # Q-networkを更新するバッチの大記載
 TEST_EPOCHS_INTERVAL = 50 # 何エポック毎にテストするか
 TEST_EPOCHS = 50 # テスト回数
 PRIORITIZED_MODE_BORDER = 0.3 # prioritized experience replayに入る正答率
@@ -146,11 +146,13 @@ symbols_noun = Data.name_noun
 symbols_verb = Data.name_verb # 動詞の選択肢
 objects_length = len(symbols) # 物体の数:5(名詞)+4(動詞)+1(分からない)
 
-guess_length = 1 # '分からない'用の次元数
+# guess_length = 1 # '分からない'用の次元数
+cur_loop_length = 1 # ループ回数を保存する次元
 
 parent_length = 32
 
-state_length = actions_length + features_length + objects_length + guess_length
+# state_length = actions_length + features_length + objects_length + guess_length
+state_length = actions_length + features_length + objects_length + cur_loop_length
 output_length = actions_length + objects_length
 
 parent_FE = get_fe(IMAGE_PATH) #表情一覧を取得
@@ -236,12 +238,13 @@ for i in range(2):
             requests = []
             mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
             mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
-            guess = [0] # not_sureを選んだ回数
+            # guess = [0] # not_sureを選んだ回数
+            cur_loop = [0] # loop回数を保存する、名詞のみ学習のときには使わない
             not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
             #parent_order = np.reshape(parent_order, [1, parent_length])
             parent_order = np.reshape(parent_order, [1, parent_length, parent_length, 1])
             
-            memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
+            memory_none = [np.concatenate([fea_vec, fea_val, obj, cur_loop]), np.concatenate([fea_vec, fea_val, obj, cur_loop]), 
                         [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
             memory_in = [memory_none] * 2 * MAX_NUMBER_OF_STEPS
             
@@ -253,7 +256,7 @@ for i in range(2):
             for step in range(MAX_NUMBER_OF_STEPS):
                 pre_fea_vec = copy.deepcopy(fea_vec)
                 pre_obj_vec = copy.deepcopy(obj)
-                state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state1 = np.reshape(state1, [1, state_length])
                 mask1 = np.reshape(mask1, [1, output_length])
                 action_step_state[0][step] = state1
@@ -268,7 +271,7 @@ for i in range(2):
                 request = actions[obj_val_idx]
                 requests.append(request)
                 fea_val = Data.Overfetch(objectIndex, list(set(requests)), rand, parent_select)       
-                state2 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state2 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state2 = np.reshape(state2, [1,state_length])
                 mask2 = np.reshape(mask2, [1, output_length])
                 action_step_state[0][step+1] = state2
@@ -290,7 +293,7 @@ for i in range(2):
                 
                 memory_in[step] = [state1.reshape(-1), state2.reshape(-1), out_1, out_2, mask1.reshape(-1), mask2.reshape(-1), obj_val_idx, reward, terminal, parent_order.reshape(-1)]
                 
-                state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 next_out = fea_vec+obj
                 
                 memory_in[step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward, terminal, parent_order.reshape(-1)]
@@ -397,11 +400,12 @@ for i in range(2):
         requests = []
         mask1 = [1] * actions_length + [0] * objects_length # 特徴選択用のmask
         mask2 = [0] * actions_length + [1] * objects_length # 名前予測用のmask
-        guess = [0] # not_sureを選んだ回数
+        # guess = [0] # not_sureを選んだ回数
+        cur_loop = [0] # ループ回数を保存してstateに組み込む
         not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
         #parent_order = np.reshape(parent_order, [1, parent_length])
                 
-        memory_none = [np.concatenate([fea_vec, fea_val, obj, guess]), np.concatenate([fea_vec, fea_val, obj, guess]), 
+        memory_none = [np.concatenate([fea_vec, fea_val, obj, cur_loop]), np.concatenate([fea_vec, fea_val, obj, cur_loop]), 
             [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
         
         # 名詞と動詞を入れるメモリを用意するため、リストを倍にする
@@ -444,7 +448,7 @@ for i in range(2):
                 
                 pre_fea_vec = copy.deepcopy(fea_vec)
                 pre_obj_vec = copy.deepcopy(obj)
-                state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state1 = np.reshape(state1, [1, state_length])
                 mask1 = np.reshape(mask1, [1, output_length])
                 action_step_state[loop][0][step] = state1 # 動詞学習の際に名詞学習の結果を上書きしている？要検討
@@ -459,7 +463,7 @@ for i in range(2):
                 request = actions[obj_val_idx]
                 requests.append(request)
                 fea_val = Data.Overfetch(objectIndex[loop], list(set(requests)), rand, parent_select)       
-                state2 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state2 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state2 = np.reshape(state2, [1,state_length])
                 mask2 = np.reshape(mask2, [1, output_length])
                 action_step_state[loop][0][step+1] = state2
@@ -486,7 +490,7 @@ for i in range(2):
                 # for j, (state_b, next_state_b, out_b, next_out_b, mask_b, next_mask_b, action_b, reward_b, terminal_b, parent_order_b) in enumerate(eps):
                 # ValueError: too many values to unpack (expected 10)
             
-                state1 = np.concatenate([fea_vec, fea_val, obj, guess])
+                state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 next_out = fea_vec+obj
 
                 memory_in[loop][step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward[loop], terminal[loop], parent_order.reshape(-1)]
