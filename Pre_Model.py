@@ -208,7 +208,7 @@ class QNetwork:
         # print(f'one time TDerror calc : {time.time() - TDerror_calc}')
         
         # batch_sel = time.time()
-        batch_memory = []
+        batch_memory = Memory(max_size=batch_size)
         idx = 0
         tmp_sum_absolute_TDerror = 0
         for (i, randnum) in enumerate(generatedrand_list):
@@ -216,13 +216,12 @@ class QNetwork:
                 tmp_sum_absolute_TDerror += abs(memory_TDerror.buffer[idx]) + 0.0001
                 idx += 1
                 
-            batch_memory.append(memory.buffer[idx])
+            batch_memory.add(memory.buffer[idx])
         # print(f'one time batch select : {time.time() - batch_sel}')
 
         
         inputs = np.zeros((batch_size, 2*self.step_size, self.state_size))
         targets = np.zeros((batch_size, self.output_size))
-        inputs = np.zeros((batch_size, 2*self.step_size, self.state_size))
         state_t = np.zeros((1, 2*self.step_size, self.state_size))
         next_state_t = np.zeros((1, 2*self.step_size, self.state_size))
         
@@ -230,13 +229,12 @@ class QNetwork:
         out_vec_t = np.zeros((1, 2*self.step_size, self.output_size))
         next_out_vec_t = np.zeros((1, 2*self.step_size, self.output_size))
         
-        targets = np.zeros((batch_size, self.output_size)) # 怪しい
         targets_restore = np.zeros((batch_size, 2*self.step_size, self.output_size))
         masks = np.ones((batch_size, self.output_size))
         #parent_orders = np.zeros((batch_size, self.parent_size))
         parent_orders = np.zeros((batch_size, self.parent_size, self.parent_size, 1))
         
-        for i, eps in enumerate(batch_memory):
+        for i, eps in enumerate(batch_memory.buffer):
             for j, (state_b, next_state_b, out_b, next_out_b, mask_b, next_mask_b, action_b, reward_b, terminal_b, parent_order_b) in enumerate(eps):
                 # batch_calc = time.time()
                 inputs[i][j:j+1] = state_b
@@ -369,29 +367,34 @@ class QNetwork:
         
         for episode in range(test_epochs):
             rand = np.random.randint(0, 65535)
-            obj = [0] * self.object_size
-            fea_vec = [0] * self.action_size # 特徴の種類
-            fea_val = [0] * self.feature_length # 特徴量の値
-            requests = []
+            obj = [[0] * self.object_size] * max_number_of_loops
+            fea_vec = [[0] * self.action_size] * max_number_of_loops # 特徴の種類
+            fea_val = [[0] * self.feature_length] * max_number_of_loops # 特徴量の値
+            requests = [[], []]
             # guess = [0] # not_sureを選んだ回数
             cur_loop = [0] # ループ回数を保存、stateに組み込む
             not_sure_count = 0 # not_sureをそのエピソードで選んだかどうかを保存するフラグ
 
             action_step_state = np.zeros((max_number_of_loops, 1, 2*self.step_size, self.state_size))
             out = np.zeros((max_number_of_loops, 1, 2*self.step_size, self.output_size))
+
+            # 答えを決める
+            objectIndex = [0, 0]
+            objectIndex[0] = random.randint(0, len(symbols_noun)-2)
+            if objectIndex[0] <= 1:
+                objectIndex[1] = 5
+            else:
+                objectIndex[1] = objectIndex[0] + 4
             
             for step in range(max_number_of_steps):
                 reward = [0, 0]
                 terminal = [0, 0]
                 for loop in range(max_number_of_loops):
+                    cur_loop[0] = loop
                     parent_intent = [0, 0]
                     parent_intent[loop] = 1
                     parent_select = loop
-                    if parent_select == 0:
-                        objectIndex = random.randint(0, len(symbols_noun)-2)
-                    else:
-                        objectIndex = random.randint(len(symbols_noun)-1, len(symbols)-2)
-                    
+                     
                     infant_intent = [0, 0]
                     idx = random.randint(0, 1)
                     infant_intent[idx] = 1
@@ -406,9 +409,9 @@ class QNetwork:
 
                     parent_order = np.reshape(parent_order, [1, self.parent_size, self.parent_size, 1])
 
-                    pre_fea_vec = copy.deepcopy(fea_vec)
-                    pre_obj_vec = copy.deepcopy(obj)
-                    state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
+                    pre_fea_vec = copy.deepcopy(fea_vec[loop])
+                    pre_obj_vec = copy.deepcopy(obj[loop])
+                    state1 = np.concatenate([fea_vec[loop], fea_val[loop], obj[loop], cur_loop])
                     state1 = np.reshape(state1, [1, self.state_size])
                     mask1 = np.reshape(mask1, [1, self.output_size])
                     action_step_state[loop][0][step] = state1
@@ -417,29 +420,29 @@ class QNetwork:
                     
                     obj_val_idx = np.argmax(self.model([action_step_state[loop], out[loop], mask1, parent_order]))# 時刻tで取得する特徴量を決定
 
-                    fea_vec[obj_val_idx] = 1
+                    fea_vec[loop][obj_val_idx] = 1
                     request = actions[obj_val_idx]
-                    requests.append(request)
-                    fea_val = Data.Overfetch(objectIndex, list(set(requests)), rand, parent_select)       
-                    state2 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
+                    requests[loop].append(request)
+                    fea_val[loop] = Data.Overfetch(objectIndex[loop], list(set(requests[loop])), rand, parent_select)       
+                    state2 = np.concatenate([fea_vec[loop], fea_val[loop], obj[loop], cur_loop])
                     state2 = np.reshape(state2, [1, self.state_size])
                     mask2 = np.reshape(mask2, [1, self.output_size])
                     action_step_state[loop][0][step+1] = state2
-                    out_2 = np.concatenate([fea_vec, pre_obj_vec])
+                    out_2 = np.concatenate([fea_vec[loop], pre_obj_vec])
                     out[loop][0][step+1] = np.reshape(out_2, [1, self.output_size])
                     obj_name_idx = np.argmax(self.model([action_step_state[loop], out[loop], mask2, parent_order])) # 時刻tで取得する物体の名称を決定
 
                     name = symbols[obj_name_idx - self.action_size]
-                    obj[obj_name_idx - self.action_size] = 0
+                    obj[loop][obj_name_idx - self.action_size] = 0
                     if name == 'not_sure':
                         not_sure_count = 1
 
                     # 報酬を設定し、与える
-                    reward, terminal = reward_func_verbnoun(objectIndex, (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
+                    reward, terminal = reward_func_verbnoun(objectIndex[loop], (obj_name_idx - self.action_size), not_sure_count, step, max_number_of_steps,
                                                                     True, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name, reward, terminal)
                     not_sure_count = 0
                     
-                    state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
+                    state1 = np.concatenate([fea_vec[loop], fea_val[loop], obj[loop], cur_loop])
 
                 if terminal == [1, 1]:
                     if reward == [1, 1]:
