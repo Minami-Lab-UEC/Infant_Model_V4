@@ -186,6 +186,11 @@ memory = Memory(max_size=MEMORY_SIZE)
 memory_TDerror = Memory_TDerror(max_size=MEMORY_SIZE, state_size=state_length, output_size=output_length, step_size=MAX_NUMBER_OF_STEPS, parent_size=parent_length)
 actor = Actor(features_length=features_length, objects_length=objects_length, actions_length=actions_length, output_size=output_length, MODEL_LOAD=MODEL_LOAD)
 
+memory_TDerror_noun = Memory_TDerror(max_size=MEMORY_SIZE, state_size=state_length, output_size=output_length, step_size=MAX_NUMBER_OF_STEPS, parent_size=parent_length)
+memory_TDerror_verb = Memory_TDerror(max_size=MEMORY_SIZE, state_size=state_length, output_size=output_length, step_size=MAX_NUMBER_OF_STEPS, parent_size=parent_length)
+memory_episode_noun = Memory(max_size=MEMORY_SIZE)
+memory_episode_verb = Memory(max_size=MEMORY_SIZE)
+
 # 名詞だけを学習するループ
 # ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_{NUM_EPISODES}'
 ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_10000'
@@ -195,8 +200,8 @@ for i in range(1, 2):
     name_select_list = np.empty((NUM_EPISODES, MAX_NUMBER_OF_LOOPS, MAX_NUMBER_OF_STEPS), dtype=object) # 名称選択の保存リスト
     feature_select_list = np.empty_like(name_select_list) # 特徴選択の保存リスト
 
-    memory_episode_list = [memory_episode] * MAX_NUMBER_OF_LOOPS
-    # memory_TDerror_list = [memory_TDerror] * MAX_NUMBER_OF_LOOPS
+    memory_episode_list = [memory_episode_noun, memory_episode_verb]
+    memory_TDerror_list = [memory_TDerror_noun, memory_TDerror_verb]
 
     if os.path.isfile(ckpt_path + '.index'):
         if i == 0:
@@ -306,6 +311,7 @@ for i in range(1, 2):
                 memory_episode.add(memory_in)
                 TDerror = memory_TDerror.get_TDerror(memory_episode, GAMMA, mainQN, targetQN)
                 memory_TDerror.add(TDerror)
+                # print(memory_TDerror.len())
                 
                 if (memory_episode.len() > BATCH_SIZE) and terminal == 1:
                     if PER_MODE == True:
@@ -399,8 +405,8 @@ for i in range(1, 2):
         # step終了を判断する変数
         # terminal = [0, 0]
         
-        act_val = np.zeros(output_length)
-        act_name = np.zeros(output_length)
+        # act_val = np.zeros(output_length)
+        # act_name = np.zeros(output_length)
         obj = [[0] * objects_length] * MAX_NUMBER_OF_LOOPS
         fea_vec = [[0] * actions_length] * MAX_NUMBER_OF_LOOPS # 特徴の種類
         fea_val = [[0] * features_length] * MAX_NUMBER_OF_LOOPS # 特徴量の値
@@ -507,8 +513,9 @@ for i in range(1, 2):
                 # TDerror_calc = time.time()
                 memory_step.add(memory_in[loop])
                 memory_episode_list[loop].add(memory_in[loop])
-                TDerror = memory_TDerror.get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
-                memory_TDerror.add(TDerror)
+                TDerror = memory_TDerror_list[loop].get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
+                memory_TDerror_list[loop].add(TDerror)
+                # print(memory_TDerror_list[loop].len())
                 # print(f'one time TDerror calc : {time.time() - TDerror_calc}')
 
                 # print(f'memory_episode.len() : {memory_episode_list[loop].len()}')
@@ -534,7 +541,7 @@ for i in range(1, 2):
                     if episode % SET_TARGETQN_INTERVAL == 0:
                         # print('SET_TARGETQN')
                         targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
-                        memory_TDerror.update_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
+                        memory_TDerror_list[loop].update_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
             
             # print(f'terminal : {terminal}, reward : {reward}')
             if terminal == [1, 1]: # 名詞と動詞どちらも正解かstepの上限まで達したら
@@ -562,8 +569,8 @@ for i in range(1, 2):
             if acc[-1] >= PRIORITIZED_MODE_BORDER:
                 PER_MODE = True
                 
-        # if episode == 1000 or episode == 5000 or episode == 8000:
-        #     mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_{episode}_{i}')
+        if episode == 1000 or episode == 5000 or episode == 8000:
+            mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_verbafternoun_{episode}_{i}')
 
         # print(name_select_list)
         # print(feature_select_list)
