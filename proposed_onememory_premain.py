@@ -51,7 +51,7 @@ IMAGE_PATH = './jaffedbase/jaffedbase/'
 # In[3]:
 
 
-def plot_history(epochs, acc, i, figure_name='proposed_onememory'):
+def plot_history(epochs, acc, i, figure_name='onememory'):
     # print(history.history.keys())
     
     # clear_output(wait = True)
@@ -95,7 +95,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 10000  # 総試行回数(episode数)
+NUM_EPISODES = 20000  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
@@ -166,7 +166,7 @@ verb_p = 0
 cols = ['nounorverb', 'ans']
 df = pd.DataFrame(index=[], columns=cols)
 
-GPU_ID = 3
+GPU_ID = 2
 physical_devices = tf.config.list_physical_devices('GPU')
 # tf.config.list_physical_devices('GPU')
 tf.config.set_visible_devices(physical_devices[GPU_ID], 'GPU')
@@ -200,8 +200,8 @@ for i in range(1, 2):
     name_select_list = np.empty((NUM_EPISODES, MAX_NUMBER_OF_LOOPS, MAX_NUMBER_OF_STEPS), dtype=object) # 名称選択の保存リスト
     feature_select_list = np.empty_like(name_select_list) # 特徴選択の保存リスト
 
-    memory_episode_list = [memory_episode_noun, memory_episode_verb]
-    memory_TDerror_list = [memory_TDerror_noun, memory_TDerror_verb]
+    # memory_episode_list = [memory_episode_noun, memory_episode_verb]
+    # memory_TDerror_list = [memory_TDerror_noun, memory_TDerror_verb]
 
     if os.path.isfile(ckpt_path + '.index'):
         if i == 0:
@@ -217,7 +217,7 @@ for i in range(1, 2):
     # NUM_EPISODES = 10000  # 総試行回数(episode数)
 
     # 名詞→動詞の順に学習するループ
-    for episode in range(NUM_EPISODES):
+    for episode in range(NUM_EPISODES-10000, NUM_EPISODES):
         # 正解の場合フラグを立てる
         correct = 0
 
@@ -248,18 +248,20 @@ for i in range(1, 2):
             [0] * output_length, [0] * output_length, np.zeros(output_length), np.zeros(output_length), 0, 0, 0, np.zeros(parent_length*parent_length)]
         
         # 名詞と動詞を入れるメモリを用意するため、リストを倍にする
-        memory_in = [[memory_none] * 2 * MAX_NUMBER_OF_STEPS] * MAX_NUMBER_OF_LOOPS
+        memory_in = [memory_none] * 2 * MAX_NUMBER_OF_STEPS
                 
-        action_step_state = np.zeros((MAX_NUMBER_OF_LOOPS, 1, 2 * MAX_NUMBER_OF_STEPS, state_length))
-        out = np.zeros((MAX_NUMBER_OF_LOOPS, 1, 2 * MAX_NUMBER_OF_STEPS, output_length))
+        action_step_state = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, state_length))
+        out = np.zeros((1, 2 * MAX_NUMBER_OF_STEPS, output_length))
 
         # 答えを決める
         objectIndex = [0, 0]
         objectIndex[0] = random.randint(0, len(symbols_noun)-2)
-        if objectIndex[0] <= 1:
-            objectIndex[1] = 5
-        else:
-            objectIndex[1] = objectIndex[0] + 4
+        objectIndex[1] = objectIndex[0]
+        # if objectIndex[0] <= 1:
+        #     objectIndex[1] = 5
+        # else:
+        #     objectIndex[1] = objectIndex[0] + 4
+        print(f'ans : {symbols[objectIndex[0]], symbols[objectIndex[1]]}')
         
         for step in range(MAX_NUMBER_OF_STEPS):
             reward = [0, 0]
@@ -270,7 +272,8 @@ for i in range(1, 2):
                 cur_loop[0] = loop
                 parent_intent = [0, 0]
                 parent_intent[loop] = 1
-                parent_select = loop
+                parent_select = 0
+                # parent_select = loop
 
                 infant_intent = [0, 0]
                 idx = random.randint(0, 1)
@@ -292,11 +295,11 @@ for i in range(1, 2):
                 state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state1 = np.reshape(state1, [1, state_length])
                 mask1 = np.reshape(mask1, [1, output_length])
-                action_step_state[loop][0][step] = state1 # 動詞学習の際に名詞学習の結果を上書きしている？要検討
+                action_step_state[0][step] = state1 # 動詞学習の際に名詞学習の結果を上書きしている？要検討
                 out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
-                out[loop][0][step] = np.reshape(out_1, [1, output_length])
+                out[0][step] = np.reshape(out_1, [1, output_length])
 
-                obj_val_idx, retTargetQs = actor.get_value(action_step_state[loop], out[loop], mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
+                obj_val_idx, retTargetQs = actor.get_value(action_step_state, out, mask1, parent_order, episode, mainQN) # 時刻tで取得する特徴量を決定
                 feature_select_list[episode, loop, step] = actions[obj_val_idx]
                 retTargetQs = retTargetQs[retTargetQs != 0]
 
@@ -307,11 +310,11 @@ for i in range(1, 2):
                 state2 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 state2 = np.reshape(state2, [1,state_length])
                 mask2 = np.reshape(mask2, [1, output_length])
-                action_step_state[loop][0][step+1] = state2
+                action_step_state[0][step+1] = state2
                 out_2 = np.concatenate([fea_vec, pre_obj_vec])
-                out[loop][0][step+1] = np.reshape(out_2, [1, output_length])
+                out[0][step+1] = np.reshape(out_2, [1, output_length])
                 # print(f'action_step_state : {len(action_step_state[loop][0][step])}, out : {len(out[loop][0][step])}, mask2 : {len(mask2)}, parent_order : {len(parent_order)}')
-                obj_name_idx = actor.get_name(action_step_state[loop], out[loop], mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
+                obj_name_idx = actor.get_name(action_step_state, out, mask2, parent_order, episode, mainQN) # 時刻tで取得する物体の名称を決定
 
                 name = symbols[obj_name_idx - actions_length]
                 name_select_list[episode, loop, step] = name
@@ -323,21 +326,21 @@ for i in range(1, 2):
                 ans_noun_verb.append(symbols[objectIndex[loop]])
 
                 reward, terminal = reward_func_verbnoun(objectIndex[loop], (obj_name_idx - actions_length), not_sure_count, step, MAX_NUMBER_OF_STEPS,
-                                                                        False, requests, request, obj_val_idx, 3, symbols, symbols_verb, parent_select, name, reward, terminal)
+                                                                        False, requests, request, obj_val_idx, 3, symbols, symbols_verb, loop, name, reward, terminal)
 
                 not_sure_count = 0 # 「分からない」フラグを元に戻す
 
-                memory_in[loop][step] = [state1.reshape(-1), state2.reshape(-1), out_1, out_2, mask1.reshape(-1), mask2.reshape(-1), obj_val_idx, reward[loop], terminal[loop], parent_order.reshape(-1)]
+                memory_in[step] = [state1.reshape(-1), state2.reshape(-1), out_1, out_2, mask1.reshape(-1), mask2.reshape(-1), obj_val_idx, reward[loop], terminal[loop], parent_order.reshape(-1)]
                 # for j, (state_b, next_state_b, out_b, next_out_b, mask_b, next_mask_b, action_b, reward_b, terminal_b, parent_order_b) in enumerate(eps):
                 # ValueError: too many values to unpack (expected 10)
             
                 state1 = np.concatenate([fea_vec, fea_val, obj, cur_loop])
                 next_out = fea_vec+obj
 
-                memory_in[loop][step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward[loop], terminal[loop], parent_order.reshape(-1)]
+                memory_in[step+1] = [state2.reshape(-1), state1.reshape(-1), out_2, next_out, mask2.reshape(-1), mask1.reshape(-1), obj_name_idx, reward[loop], terminal[loop], parent_order.reshape(-1)]
 
                 # TDerror_calc = time.time()
-                memory_step.add(memory_in[loop])
+                memory_step.add(memory_in)
                 # memory_episode_list[loop].add(memory_in[loop])
                 # TDerror = memory_TDerror_list[loop].get_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
                 # memory_TDerror_list[loop].add(TDerror)
@@ -346,14 +349,14 @@ for i in range(1, 2):
 
                 # print(f'memory_episode.len() : {memory_episode_list[loop].len()}')
 
-                if (memory_episode_list[loop].len() > BATCH_SIZE) and terminal[loop] == 1:
+                if (memory_episode.len() > BATCH_SIZE) and terminal[loop] == 1:
                     if PER_MODE == True:
-                        print('experience_replay')
+                        # print('experience_replay')
                         # exp_replay_time = time.time()
-                        history = mainQN.prioritized_experience_replay(memory_episode_list[loop], BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
+                        history = mainQN.prioritized_experience_replay(memory_episode, BATCH_SIZE, GAMMA, targetQN, memory_TDerror)
                         # print(f'exp replay time : {time.time() - exp_replay_time}')
                     else:
-                        history = mainQN.replay(memory_episode_list[loop], BATCH_SIZE, GAMMA, targetQN)
+                        history = mainQN.replay(memory_episode, BATCH_SIZE, GAMMA, targetQN)
                 else:
                     # replay_time = time.time()
                     history = mainQN.replay(memory_step, 1, GAMMA, targetQN)
@@ -367,11 +370,12 @@ for i in range(1, 2):
                     if episode % SET_TARGETQN_INTERVAL == 0:
                         # print('SET_TARGETQN')
                         targetQN.model.set_weights(mainQN.model.get_weights()) # 行動決定と価値計算のQネットワークを同じにする
-                        memory_TDerror_list[loop].update_TDerror(memory_episode_list[loop], GAMMA, mainQN, targetQN)
+                        memory_TDerror.update_TDerror(memory_episode, GAMMA, mainQN, targetQN)
             
-            # print(f'terminal : {terminal}, reward : {reward}')
+            print(f'terminal : {terminal}, reward : {reward}')
+            print(f'predict : {pred_noun_verb}')
             if terminal == [1, 1]: # 名詞と動詞どちらも正解かstepの上限まで達したら
-                print(f'predict : {pred_noun_verb}, ans : {ans_noun_verb}')
+                # print(f'predict : {pred_noun_verb}, ans : {ans_noun_verb}')
                 # 正解の場合フラグを立てる
                 if pred_noun_verb == ans_noun_verb:
                     correct = 1
@@ -382,6 +386,7 @@ for i in range(1, 2):
             reward_sum, reward_sum_n, reward_sum_v = mainQN.test_onememory(Data, actor, symbols, symbols_noun, symbols_verb, actions,  
                                                             mask1, mask2, TEST_EPOCHS, MAX_NUMBER_OF_STEPS, MAX_NUMBER_OF_LOOPS, episode, DIR_PATH,
                                                                     PER_ERROR, parent_FE)
+            print(f'reward_sum : {reward_sum}')
             if len(epochs) == 0:
                 epoch = 0
             else:
@@ -395,15 +400,16 @@ for i in range(1, 2):
             if acc[-1] >= PRIORITIZED_MODE_BORDER:
                 PER_MODE = True
                 
-        if episode == 1000 or episode == 5000 or episode == 8000:
-            mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_proposed_onememory_{episode}_{i}')
+        # if episode == 1000 or episode == 5000 or episode == 8000:
+        if episode % 100 == 0:
+            mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_onememory_{episode}_{i}')
 
         # print(name_select_list)
         # print(feature_select_list)
     np.save(DIR_PATH + 'numpy/' + f'proposed_onememory_name_{NUM_EPISODES}_{i}.npy', name_select_list)
     np.save(DIR_PATH + 'numpy/' + f'proposed_onememory_feature_{NUM_EPISODES}_{i}.npy', feature_select_list)
 
-    mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_proposed_onememory_{NUM_EPISODES}_{i}')
+    mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_onememory_{NUM_EPISODES}_{i}')
         
 
     # 時間計測の結果を出力
