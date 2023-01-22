@@ -51,7 +51,7 @@ IMAGE_PATH = './jaffedbase/jaffedbase/'
 # In[3]:
 
 
-def plot_history(epochs, acc, i, figure_name='verbafternoun'):
+def plot_history(epochs, acc, i, figure_name='base'):
     # print(history.history.keys())
     
     # clear_output(wait = True)
@@ -95,7 +95,7 @@ DQN_MODE = False    # TrueがDQN、FalseがDDQNです
 PER_MODE = True
 MODEL_LOAD = False
 
-NUM_EPISODES = 10000  # 総試行回数(episode数)
+NUM_EPISODES = 20000  # 総試行回数(episode数)
 # NUM_EPISODES = 1  # 総試行回数(episode数)
 MAX_NUMBER_OF_STEPS = 5  # 1試行のstep数
 MAX_NUMBER_OF_LOOPS = 2 # 1stepの品詞の出力数(名詞→動詞なので2)
@@ -193,8 +193,8 @@ memory_episode_verb = Memory(max_size=MEMORY_SIZE)
 
 # 名詞だけを学習するループ
 # ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_{NUM_EPISODES}'
-ckpt_path = DIR_PATH + f'check_points/my_checkpoint_onlynoun_10000'
-for i in range(1, 2):
+ckpt_path = DIR_PATH + f'check_points/my_checkpoint_proposed_onememory_10000_0'
+for i in range(0, 1):
     acc = []
     epochs = []
     name_select_list = np.empty((NUM_EPISODES, MAX_NUMBER_OF_LOOPS, MAX_NUMBER_OF_STEPS), dtype=object) # 名称選択の保存リスト
@@ -204,9 +204,9 @@ for i in range(1, 2):
     memory_TDerror_list = [memory_TDerror_noun, memory_TDerror_verb]
 
     if os.path.isfile(ckpt_path + '.index'):
-        if i == 0:
-            print('not load weights for model, start learning!!')
         if i == 1:
+            print('not load weights for model, start learning!!')
+        if i == 0:
             mainQN.model.load_weights(ckpt_path)
             print('model load weights!!')   
     else:
@@ -391,7 +391,7 @@ for i in range(1, 2):
     # NUM_EPISODES = 10000  # 総試行回数(episode数)
 
     # 名詞→動詞の順に学習するループ
-    for episode in range(NUM_EPISODES):
+    for episode in range(NUM_EPISODES-10000, NUM_EPISODES):
         # 正解の場合フラグを立てる
         correct = 0
 
@@ -570,14 +570,14 @@ for i in range(1, 2):
                 PER_MODE = True
                 
         if episode == 1000 or episode == 5000 or episode == 8000:
-            mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_verbafternoun_{episode}_{i}')
+            mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_base_{episode}_{i}')
 
         # print(name_select_list)
         # print(feature_select_list)
     np.save(DIR_PATH + 'numpy/' + f'verbafternoun_name_{NUM_EPISODES}_{i}.npy', name_select_list)
     np.save(DIR_PATH + 'numpy/' + f'verbafternoun_feature_{NUM_EPISODES}_{i}.npy', feature_select_list)
 
-    mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_verbafternoun_{NUM_EPISODES}_{i}')
+    mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_base_{NUM_EPISODES}_{i}')
         
 
     # 時間計測の結果を出力
