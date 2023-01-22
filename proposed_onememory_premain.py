@@ -400,8 +400,8 @@ for i in range(1, 2):
             if acc[-1] >= PRIORITIZED_MODE_BORDER:
                 PER_MODE = True
                 
-        # if episode == 1000 or episode == 5000 or episode == 8000:
-        if episode % 100 == 0:
+        if episode == 1000 or episode == 4000 or episode == 7000:
+        # if episode % 100 == 0:
             mainQN.model.save_weights(DIR_PATH+f'check_points/my_checkpoint_onememory_{episode}_{i}')
 
         # print(name_select_list)
