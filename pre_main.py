@@ -193,7 +193,7 @@ for episode in range(NUM_EPISODES):
     np.random.seed(episode)
     rand = np.random.randint(0, 65535)
     
-    parent_intent = [0, 1]
+    parent_intent = [1, 0]
     # parent_select = random.randint(0, 1)
     # 親の意図を確率変数で変化させる
     # 0 : noun
