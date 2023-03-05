@@ -29,28 +29,12 @@ def pick_tree(pick):
 
 max_number_of_steps = 5 # 特徴選択のマックス回数は5
 
-picklist = np.load('result_9/numpy/proposed_onememory_except_feature_20000_1.npy', allow_pickle=True)
-# picklist = list(map(lambda x: x[0] + ['None'] * (max_number_of_steps - len(x[0])), picklist))
-# picklist = [[ for p in pl] for pl in picklist]
-for j in range(2):
-	# for i in range(len(picklist[:, j]) // 10000):
-	# 	print('-----------------------------')
-	# 	print('{}:{}episode :'.format(i*10000, (i+1)*10000))
-	# 	pick_tree(picklist[:,j][i*10000:(i+1)*10000])
-	# 	print('-----------------------------')
+picklist = np.load('result_HCS_after_60/obj_val_idx_list.npy', allow_pickle=True)
+picklist = list(map(lambda x: x[0] + ['None'] * (max_number_of_steps - len(x[0])), picklist))
+for i in range(len(picklist) // 10000):
 	print('-----------------------------')
-	print('{}:{}episode :'.format(0, 2000))
-	pick_tree(picklist[:,j][0:2000])
+	print('{}:{}episode :'.format(i*10000, (i+1)*10000))
+	pick_tree(picklist[i*10000:(i+1)*10000])
 	print('-----------------------------')
-	print('{}:{}episode :'.format(2000, 4000))
-	pick_tree(picklist[:,j][2000:4000])
-	print('-----------------------------')
-	print('{}:{}episode :'.format(4000, 9000))
-	pick_tree(picklist[:,j][4000:9000])
-	print('-----------------------------')
-	print('{}:{}episode :'.format(9000, 10000))
-	pick_tree(picklist[:,j][9000:10000])
-	print('-----------------------------')
-
 
 

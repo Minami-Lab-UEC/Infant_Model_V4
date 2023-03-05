@@ -242,23 +242,23 @@ class QNetwork:
                     next_state_t[j+1:j+2] = next_state_b
                     #next_state_t[j+1:j+2] = np.reshape(next_state_b, [1, self.state_size])
                     next_out_vec_t[j+1:j+2] = np.reshape(next_out_b, [1, self.output_size]) 
-                    retmainQs = self.model.predict([next_state_t, next_out_vec_t, next_mask_b], verbose=0)
+                    retmainQs = self.model([next_state_t, next_out_vec_t, next_mask_b])
                     next_action = np.argmax(retmainQs)  # 最大の報酬を返す行動を選択する
-                    target = reward_b + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask_b], verbose=0)[0][next_action]
+                    target = reward_b + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask_b])[0][next_action]
 
                 state_b = np.reshape(state_b, [1, self.state_size])
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                #targets[i][j] = self.model.predict([state, mask_b])    # Qネットワークの出力(Q値)
+                #targets[i][j] = self.model([state, mask_b])    # Qネットワークの出力(Q値)
                 #targets[i][j][action_b] = target               # 教師信号
-                #targets[i] = self.model.predict([state, mask_b])    # 怪しい
-                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b], verbose=0)
+                #targets[i] = self.model([state, mask_b])    # 怪しい
+                targets_restore[i][j] = self.model([state_t, out_vec_t, mask_b])
                 #targets[i][action_b] = target               # 怪しい
                 targets_restore[i][j][action_b] = target
                 
             targets[i] = np.mean(targets_restore[i], axis=0)
-        history = self.model.fit([inputs, out_vec, masks], targets, epochs=1, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
+        history = self.model.fit([inputs, out_vec, masks], targets, epochs=1)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
         
         return history
     
@@ -309,19 +309,19 @@ class QNetwork:
                     next_state_t[j+1:j+2] = next_state_b
                     #next_state_t[j+1:j+2] = np.reshape(next_state_b, [1, self.state_size])
                     next_out_vec_t[j+1:j+2] = np.reshape(next_out_b, [1, self.output_size]) 
-                    retmainQs = self.model.predict([next_state_t, next_out_vec_t, next_mask_b], verbose=0)
+                    retmainQs = self.model([next_state_t, next_out_vec_t, next_mask_b])
                     next_action = np.argmax(retmainQs)  # 最大の報酬を返す行動を選択する
-                    target = reward_b + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask_b], verbose=0)[0][next_action]
+                    target = reward_b + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask_b])[0][next_action]
 
                 state_b = np.reshape(state_b, [1, self.state_size])
                 mask_b = np.reshape(mask_b, [1, self.output_size])
                 state_t[j:j+1] = state_b
                 out_vec_t[j:j+1] = np.reshape(out_b, [1, self.output_size])
-                targets_restore[i][j] = self.model.predict([state_t, out_vec_t, mask_b], verbose=0)
+                targets_restore[i][j] = self.model([state_t, out_vec_t, mask_b])
                 targets_restore[i][j][action_b] = target
                 
             targets[i] = np.mean(targets_restore[i], axis=0)
-        history = self.model.fit([inputs, out_vec, masks], targets, epochs=1, verbose=0)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
+        history = self.model.fit([inputs, out_vec, masks], targets, epochs=1)  # epochsは訓練データの反復回数、verbose=0は表示なしの設定
         
         return history
         
@@ -358,7 +358,7 @@ class QNetwork:
                 action_step_state[0][step] = state1
                 out_1 = np.concatenate([pre_fea_vec, pre_obj_vec])
                 out[0][step] = np.reshape(out_1, [1, self.output_size])
-                obj_val_idx = np.argmax(self.model.predict([action_step_state, out,  mask1], verbose=0))# 時刻tで取得する特徴量を決定
+                obj_val_idx = np.argmax(self.model([action_step_state, out,  mask1]))# 時刻tで取得する特徴量を決定
                 
                 tmp_info[2*step+1] = actions[obj_val_idx]
 
@@ -372,7 +372,7 @@ class QNetwork:
                 action_step_state[0][step+1] = state2
                 out_2 = np.concatenate([fea_vec, pre_obj_vec])
                 out[0][step+1] = np.reshape(out_2, [1, self.output_size])
-                obj_name_idx = np.argmax(self.model.predict([action_step_state, out, mask2], verbose=0)) # 時刻tで取得する物体の名称を決定
+                obj_name_idx = np.argmax(self.model([action_step_state, out, mask2])) # 時刻tで取得する物体の名称を決定
 
                 name = symbols[obj_name_idx - self.action_size]
                 obj[obj_name_idx - self.action_size] = 0
@@ -403,8 +403,8 @@ class QNetwork:
                         reward_sum += 1
                         break
         
-        if optune == True:
-            result_df.to_csv(dir_path+str(num_episode+1)+'_result.csv')
+        # if optune == True:
+        #     result_df.to_csv(dir_path+str(num_episode+1)+'_result.csv')
         
         return reward_sum, count, correct_count
 
@@ -459,9 +459,9 @@ class Memory_TDerror(Memory):
             next_state_t[j+1:j+2] = next_state
             #next_state_t[j+1:j+2] = np.reshape(next_state, [1, self.state_size])
             next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
-            retmainQs = mainQN.model.predict([next_state_t, next_out_vec_t, next_mask], verbose=0)
+            retmainQs = mainQN.model([next_state_t, next_out_vec_t, next_mask])
             next_action = np.argmax(retmainQs)
-            target = reward + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask], verbose=0)[0][next_action]
+            target = reward + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask])[0][next_action]
 
             state = np.reshape(state, [1, self.state_size])
             mask = np.reshape(mask, [1, self.output_size])
@@ -469,8 +469,8 @@ class Memory_TDerror(Memory):
             # out_t[j:j+1] = np.reshape(out, [1, self.output_size])
             out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size]) # out_tがないといわれる. out_vec_tではないか？20220910
             
-            # TDerror.append(target - targetQN.model.predict([state_t, out_t, mask], verbose=0)[0][action])
-            TDerror.append(target - targetQN.model.predict([state_t, out_vec_t, mask], verbose=0)[0][action]) # out_tがないといわれる. out_vec_tではないか？20220910
+            # TDerror.append(target - targetQN.model([state_t, out_t, mask])[0][action])
+            TDerror.append(target - targetQN.model([state_t, out_vec_t, mask])[0][action]) # out_tがないといわれる. out_vec_tではないか？20220910
         
         return sum(TDerror) / len(TDerror)
         
@@ -492,17 +492,17 @@ class Memory_TDerror(Memory):
                 next_state_t[j+1:j+2] = next_state
                 #next_state_t[j+1:j+2] = np.reshape(next_state, [1, self.state_size])
                 next_out_vec_t[j+1:j+2] = np.reshape(next_out, [1, self.output_size])
-                retmainQs = mainQN.model.predict([next_state_t, next_out_vec_t, next_mask], verbose=0)
+                retmainQs = mainQN.model([next_state_t, next_out_vec_t, next_mask])
                 next_action = np.argmax(retmainQs)
-                target = reward + gamma * targetQN.model.predict([next_state_t, next_out_vec_t, next_mask], verbose=0)[0][next_action]
+                target = reward + gamma * targetQN.model([next_state_t, next_out_vec_t, next_mask])[0][next_action]
 
                 state = np.reshape(state, [1, self.state_size])
                 mask = np.reshape(mask, [1, self.output_size])
                 state_t[j:j+1] = state
                 # out_t[j:j+1] = np.reshape(out, [1, self.output_size])
-                # TDerror.append(target - targetQN.model.predict([state_t, out_t, mask], verbose=0)[0][action])
+                # TDerror.append(target - targetQN.model([state_t, out_t, mask])[0][action])
                 out_vec_t[j:j+1] = np.reshape(out, [1, self.output_size]) # out_tがないといわれる. out_vec_tではないか？20220910
-                TDerror.append(target - targetQN.model.predict([state_t, out_vec_t, mask], verbose=0)[0][action]) # out_tがないといわれる. out_vec_tではないか？20220910
+                TDerror.append(target - targetQN.model([state_t, out_vec_t, mask])[0][action]) # out_tがないといわれる. out_vec_tではないか？20220910
                 
             self.buffer[i] = sum(TDerror) / len(TDerror)
             
@@ -532,7 +532,7 @@ class Actor:
         
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
             # print("optimum")
-            retTargetQs = mainQN.model.predict([state, out, mask], verbose=0)
+            retTargetQs = mainQN.model([state, out, mask])
             action = np.argmax(retTargetQs)  # 最大の報酬を返す行動を選択する
         else:
             # print("random")
@@ -549,7 +549,7 @@ class Actor:
         epsilon = 0.01 + 0.99 / (1.0+episode)
 
         if epsilon <= np.random.uniform(0, 1) and episode != 0 or self.MODEL_LOAD == True:
-            retTargetQs = mainQN.model.predict([state, out, mask], verbose=0)
+            retTargetQs = mainQN.model([state, out, mask])
             action = np.argmax(retTargetQs)  # 最大の報酬を返す行動を選択する
         else:
             action = random.randint(self.actions_length, self.actions_length+self.objects_length-1)  # ランダムに行動する

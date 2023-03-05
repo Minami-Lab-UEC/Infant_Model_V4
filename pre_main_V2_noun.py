@@ -239,7 +239,7 @@ for episode in range(num_episodes):
         
         #memory.add((state2, state1, mask2, mask1, obj_name_idx, reward, terminal)) # メモリの更新(物体の名称)
 
-        print('memory_episode.len() : ', memory_episode.len())
+        # print('memory_episode.len() : ', memory_episode.len())
         
         if (memory_episode.len() > batch_size) and terminal == 1:
             if PER_MODE == True:
