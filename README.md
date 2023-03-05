@@ -1,5 +1,6 @@
 # Infant_Model_V4
-担当者 : 幼児語彙獲得モデル（M2 竹下）
+担当 : 幼児語彙獲得モデル
+担当者 : 竹下虎太朗(Takeshita Kotaro)
 期間 : 2021年4月～2023年3月
 
 ## 概要
@@ -15,6 +16,7 @@
 - パスワード : takeshita
 - 作業ディレクトリ : /home/takeshita/Infant_Model_V4
 - 作業環境 : Dockerコンテナ
+- 田口さんの使っていたファイル : データサーバー(172.21.65.29)の2023/M2/Takeshita/Infant_Model_V4.zip
 
 ### 作業環境
 - Dockerコンテナ上で作業
